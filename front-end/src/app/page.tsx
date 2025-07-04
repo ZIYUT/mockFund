@@ -8,6 +8,13 @@ import { useMockFund } from '@/hooks/useMockFund';
 import { useMockUSDC } from '@/hooks/useMockUSDC';
 import { useFundShareToken } from '@/hooks/useFundShareToken';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
+import PortfolioAllocation from '@/components/PortfolioAllocation';
+import NAVChartWithCoinGecko from '@/components/NAVChartWithCoinGecko';
+import PortfolioCharts from '@/components/PortfolioCharts';
+import DebugTokenData from '@/components/DebugTokenData';
+import CacheStatus from '@/components/CacheStatus';
+import CoinGeckoDebug from '@/components/CoinGeckoDebug';
+import { testCoinGeckoConnection } from '@/lib/testCoinGeckoApi';
 
 export default function Home() {
   // 获取当前连接的账户
@@ -18,6 +25,9 @@ export default function Home() {
   const mockUSDC = useMockUSDC();
   const fundShareToken = useFundShareToken();
   
+  // 从mockFund中获取基金统计信息
+  const { fundStats, fundStatsError, isFundStatsLoading, managementFeeRate, lastFeeCollectionTimestamp } = mockFund;
+  
   // 状态管理
   const [investAmount, setInvestAmount] = useState('');
   const [redeemShares, setRedeemShares] = useState('');
@@ -25,6 +35,17 @@ export default function Home() {
   const [shareBalance, setShareBalance] = useState('0');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
+  const [isMounted, setIsMounted] = useState(false);
+  const [fundDataError, setFundDataError] = useState(false);
+  const [isLoadingFundData, setIsLoadingFundData] = useState(false);
+  const [apiTestResult, setApiTestResult] = useState<any>(null);
+  const [isTestingApi, setIsTestingApi] = useState(false);
+  // 移除数据源切换，只使用 CoinGecko
+
+  // 客户端挂载检查
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // 加载用户数据
   useEffect(() => {
@@ -37,23 +58,37 @@ export default function Home() {
   const loadUserData = async () => {
     if (!address) return;
     
+    setIsLoadingFundData(true);
+    setFundDataError(false);
+    
     try {
       // 获取USDC余额
       const usdcBalanceData = await mockUSDC.getBalance(address);
       if (usdcBalanceData) {
         setUsdcBalance(formatUnits(usdcBalanceData, 6));
+      } else {
+        setUsdcBalance('0');
       }
       
       // 获取份额余额
       const shareBalanceData = await fundShareToken.getBalance(address);
       if (shareBalanceData) {
         setShareBalance(formatUnits(shareBalanceData, 18));
+      } else {
+        setShareBalance('0');
       }
       
       // 刷新基金数据
       mockFund.refreshAllData();
     } catch (error) {
       console.error('加载用户数据失败:', error);
+      setFundDataError(true);
+      setMessage({ 
+        type: 'error', 
+        content: '网络连接不稳定，请稍后重试或检查网络设置' 
+      });
+    } finally {
+      setIsLoadingFundData(false);
     }
   };
 
@@ -157,22 +192,62 @@ export default function Home() {
     }
   };
 
+  // 测试 CoinGecko API 连接
+  const handleTestCoinGeckoApi = async () => {
+    setIsTestingApi(true);
+    setApiTestResult(null);
+    setMessage({ type: '', content: '' });
+    
+    try {
+      const result = await testCoinGeckoConnection();
+      setApiTestResult(result);
+      
+      if (result.success) {
+        setMessage({ type: 'success', content: 'CoinGecko API 连接测试成功！' });
+      } else {
+        setMessage({ type: 'error', content: `CoinGecko API 连接测试失败: ${result.error}` });
+      }
+    } catch (error) {
+      console.error('API 测试失败:', error);
+      setMessage({ type: 'error', content: `API 测试失败: ${error.message || '未知错误'}` });
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
   // 格式化基金统计数据
   const formatFundStats = () => {
     if (!mockFund.fundStats) return null;
     
-    const [totalAssets, totalShares, nav, managementFeeRate, lastFeeCollectionTimestamp] = mockFund.fundStats;
+    // 合约的 getFundStats 只返回 3 个值: (totalAssets, totalSupply, currentNAV)
+    const [totalAssets, totalShares, nav] = mockFund.fundStats;
+    
+    // 避免水合错误，使用固定格式的时间字符串
+    const formatTimestamp = (timestamp) => {
+      if (!timestamp) return 'N/A';
+      if (!isMounted) return '加载中...';
+      try {
+        return new Date(Number(timestamp) * 1000).toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      } catch (error) {
+        return 'N/A';
+      }
+    };
     
     return {
       totalAssets: formatUnits(totalAssets, 6),
       totalShares: formatUnits(totalShares, 18),
       nav: formatUnits(nav, 6),
-      managementFeeRate: Number(managementFeeRate) / 100,
-      lastFeeCollectionTimestamp: new Date(Number(lastFeeCollectionTimestamp) * 1000).toLocaleString(),
+      managementFeeRate: managementFeeRate ? (Number(managementFeeRate) / 100).toFixed(2) : 'N/A',
+      lastFeeCollectionTimestamp: formatTimestamp(lastFeeCollectionTimestamp),
     };
   };
-
-  const fundStats = formatFundStats();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -221,13 +296,20 @@ export default function Home() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">基金份额</p>
                 <p className="font-medium">{shareBalance} {fundShareToken.symbol || 'MFS'}</p>
               </div>
-              <div>
+              <div className="space-y-2">
                 <button
                   onClick={handleGetTestTokens}
                   disabled={isLoading || !isConnected}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   获取测试USDC
+                </button>
+                <button
+                  onClick={handleTestCoinGeckoApi}
+                  disabled={isTestingApi}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
+                >
+                  {isTestingApi ? '测试中...' : '测试 CoinGecko API'}
                 </button>
               </div>
             </div>
@@ -238,35 +320,111 @@ export default function Home() {
 
         {/* 基金信息 */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">基金信息</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">基金信息</h2>
+            {(fundDataError || fundStatsError) && (
+              <button
+                onClick={() => {
+                  loadUserData();
+                  mockFund.refreshAllData();
+                }}
+                disabled={isLoadingFundData || isFundStatsLoading}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-indigo-600 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {(isLoadingFundData || isFundStatsLoading) ? '重试中...' : '重试'}
+              </button>
+            )}
+          </div>
           
-          {fundStats ? (
+          {!isMounted ? (
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+              <p className="text-gray-500 dark:text-gray-400">初始化中...</p>
+            </div>
+          ) : isLoadingFundData || isFundStatsLoading ? (
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+              <p className="text-gray-500 dark:text-gray-400">加载基金信息中...</p>
+            </div>
+          ) : fundDataError || fundStatsError ? (
+            <div className="text-center py-4">
+              <p className="text-red-500 dark:text-red-400 mb-2">加载基金信息失败</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">请检查网络连接或稍后重试</p>
+              {fundStatsError && (
+                <p className="text-xs text-gray-400 mt-1">错误详情: {fundStatsError.message}</p>
+              )}
+            </div>
+          ) : fundStats ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">总资产</p>
-                <p className="font-medium">{fundStats.totalAssets} USDC</p>
+                <p className="font-medium">{formatFundStats().totalAssets} USDC</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">总份额</p>
-                <p className="font-medium">{fundStats.totalShares} {fundShareToken.symbol || 'MFS'}</p>
+                <p className="font-medium">{formatFundStats().totalShares} {fundShareToken.symbol || 'MFS'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">当前NAV</p>
-                <p className="font-medium">{fundStats.nav} USDC</p>
+                <p className="font-medium">{formatFundStats().nav} USDC</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">管理费率</p>
-                <p className="font-medium">{fundStats.managementFeeRate}%</p>
+                <p className="font-medium">{formatFundStats().managementFeeRate}%</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">最后收费时间</p>
-                <p className="font-medium">{fundStats.lastFeeCollectionTimestamp}</p>
+                <p className="font-medium">{formatFundStats().lastFeeCollectionTimestamp}</p>
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400">加载基金信息中...</p>
-          )}
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+              <p className="text-gray-500 dark:text-gray-400">加载基金信息中...</p>
+            </div>
+          )}        </div>
+
+        {/* 投资组合配置 */}
+        <div className="mb-6">
+          <PortfolioAllocation />
         </div>
+
+        {/* 净值图表 */}
+        <div className="mb-6">
+          <NAVChartWithCoinGecko />
+        </div>
+
+        {/* 投资组合图表 */}
+        <div className="mb-6">
+          <PortfolioCharts />
+        </div>
+
+        {/* 调试信息 */}
+        <div className="mb-6">
+          <DebugTokenData />
+        </div>
+
+        {/* 缓存状态 */}
+        <div className="mb-6">
+          <CacheStatus />
+        </div>
+
+        {/* CoinGecko 调试 */}
+        <div className="mb-6">
+          <CoinGeckoDebug />
+        </div>
+
+        {/* API 测试结果 */}
+        {apiTestResult && (
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">CoinGecko API 测试结果</h2>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-4">
+              <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {JSON.stringify(apiTestResult, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
 
         {/* 操作区域 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

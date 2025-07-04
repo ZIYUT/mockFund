@@ -18,10 +18,19 @@ export function useMockFund() {
     useWaitForTransactionReceipt({ hash });
 
   // 获取基金统计信息
-  const { data: fundStats, refetch: refetchFundStats } = useReadContract({
+  const { 
+    data: fundStats, 
+    refetch: refetchFundStats, 
+    error: fundStatsError,
+    isLoading: isFundStatsLoading 
+  } = useReadContract({
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getFundStats',
+    query: {
+      retry: 3,
+      retryDelay: 1000,
+    },
   });
 
   // 获取当前NAV
@@ -29,6 +38,20 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getCurrentNAV',
+  });
+
+  // 获取管理费率
+  const { data: managementFeeRate, refetch: refetchManagementFeeRate } = useReadContract({
+    address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
+    abi: MockFundABI,
+    functionName: 'managementFeeRate',
+  });
+
+  // 获取最后收费时间
+  const { data: lastFeeCollectionTimestamp, refetch: refetchLastFeeCollection } = useReadContract({
+    address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
+    abi: MockFundABI,
+    functionName: 'lastFeeCollectionTimestamp',
   });
 
   // 获取支持的代币列表
@@ -51,6 +74,29 @@ export function useMockFund() {
     abi: MockFundABI,
     functionName: 'shareToken',
   });
+
+  // 获取当前投资组合分配
+  const { data: currentAllocations, refetch: refetchCurrentAllocations } = useReadContract({
+    address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
+    abi: MockFundABI,
+    functionName: 'getCurrentAllocations',
+  });
+
+  // 获取代币持有量
+  const { data: tokenHoldings, refetch: refetchTokenHoldings } = useReadContract({
+    address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
+    abi: MockFundABI,
+    functionName: 'getTokenHoldings',
+  });
+
+  // 获取投资组合详细信息
+  const { data: portfolioBreakdown, refetch: refetchPortfolioBreakdown } = useReadContract({
+    address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
+    abi: MockFundABI,
+    functionName: 'getPortfolioBreakdown',
+  });
+
+  // Rebalancing functionality removed
 
   // 投资函数
   const invest = async (amount: string) => {
@@ -96,21 +142,7 @@ export function useMockFund() {
     }
   };
 
-  // 重新平衡函数 (仅管理员)
-  const rebalance = async () => {
-    try {
-      await writeContract({
-        address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
-        abi: MockFundABI,
-        functionName: 'rebalance',
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error('重新平衡失败:', error);
-      return { success: false, error };
-    }
-  };
+  // Rebalance function removed
 
   // 收取管理费函数 (仅管理员)
   const collectManagementFee = async () => {
@@ -205,9 +237,14 @@ export function useMockFund() {
   const refreshAllData = () => {
     refetchFundStats();
     refetchCurrentNAV();
+    refetchManagementFeeRate();
+    refetchLastFeeCollection();
     refetchSupportedTokens();
     refetchUsdcAddress();
     refetchShareTokenAddress();
+    refetchCurrentAllocations();
+    refetchTokenHoldings();
+    refetchPortfolioBreakdown();
   };
 
   return {
@@ -218,17 +255,27 @@ export function useMockFund() {
     error,
     transactionHash: hash,
     
-    // 读取数据
+    // 基础读取数据
     fundStats,
     currentNAV,
+    managementFeeRate,
+    lastFeeCollectionTimestamp,
     supportedTokens,
     usdcAddress,
     shareTokenAddress,
     
+    // 投资组合数据
+    currentAllocations,
+    tokenHoldings,
+    portfolioBreakdown,
+    
+    // 错误和加载状态
+    fundStatsError,
+    isFundStatsLoading,
+    
     // 写入函数
     invest,
     redeem,
-    rebalance,
     collectManagementFee,
     setUSDCToken,
     addSupportedToken,

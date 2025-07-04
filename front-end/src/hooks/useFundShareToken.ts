@@ -9,23 +9,39 @@ import FundShareTokenABI from '@/contracts/abis/FundShareToken.json';
  * 提供与基金份额代币交互的函数
  */
 export function useFundShareToken() {
-  // 获取用户份额余额
-  const getBalance = async (address: string) => {
+  // 获取用户份额余额（带重试机制）
+  const getBalance = async (address: string, retries = 3) => {
     if (!address || !CONTRACT_ADDRESSES.FUND_SHARE_TOKEN) return null;
     
-    try {
-      const data = await useReadContract.queryKey({
-        address: CONTRACT_ADDRESSES.FUND_SHARE_TOKEN as `0x${string}`,
-        abi: FundShareTokenABI,
-        functionName: 'balanceOf',
-        args: [address],
-      });
-      
-      return data;
-    } catch (error) {
-      console.error('获取份额余额失败:', error);
-      return null;
+    for (let i = 0; i < retries; i++) {
+      try {
+        // 使用 wagmi 的 readContract 函数
+        const { readContract } = await import('wagmi/actions');
+        const { config } = await import('@/config/web3');
+        
+        const data = await readContract(config, {
+          address: CONTRACT_ADDRESSES.FUND_SHARE_TOKEN as `0x${string}`,
+          abi: FundShareTokenABI,
+          functionName: 'balanceOf',
+          args: [address],
+        });
+        
+        return data;
+      } catch (error) {
+        console.warn(`获取份额余额失败 (尝试 ${i + 1}/${retries}):`, error);
+        
+        // 如果是最后一次尝试，返回 null
+        if (i === retries - 1) {
+          console.error('获取份额余额最终失败:', error);
+          return null;
+        }
+        
+        // 等待一段时间后重试
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
     }
+    
+    return null;
   };
 
   // 获取总供应量

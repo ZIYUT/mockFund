@@ -17,23 +17,47 @@ export function useMockUSDC() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = 
     useWaitForTransactionReceipt({ hash });
 
-  // 获取余额
-  const getBalance = async (address: string) => {
+  // 读取余额的hook
+  const { data: balanceData } = useReadContract({
+    address: CONTRACT_ADDRESSES.MOCK_USDC as `0x${string}`,
+    abi: MockUSDCABI,
+    functionName: 'balanceOf',
+    args: [],
+  });
+
+  // 获取余额（带重试机制）
+  const getBalance = async (address: string, retries = 3) => {
     if (!address) return null;
     
-    try {
-      const data = await useReadContract.queryKey({
-        address: CONTRACT_ADDRESSES.MOCK_USDC as `0x${string}`,
-        abi: MockUSDCABI,
-        functionName: 'balanceOf',
-        args: [address],
-      });
-      
-      return data;
-    } catch (error) {
-      console.error('获取USDC余额失败:', error);
-      return null;
+    for (let i = 0; i < retries; i++) {
+      try {
+        // 使用 wagmi 的 readContract 函数
+        const { readContract } = await import('wagmi/actions');
+        const { config } = await import('@/config/web3');
+        
+        const data = await readContract(config, {
+          address: CONTRACT_ADDRESSES.MOCK_USDC as `0x${string}`,
+          abi: MockUSDCABI,
+          functionName: 'balanceOf',
+          args: [address],
+        });
+        
+        return data;
+      } catch (error) {
+        console.warn(`获取USDC余额失败 (尝试 ${i + 1}/${retries}):`, error);
+        
+        // 如果是最后一次尝试，返回 null
+        if (i === retries - 1) {
+          console.error('获取USDC余额最终失败:', error);
+          return null;
+        }
+        
+        // 等待一段时间后重试
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
     }
+    
+    return null;
   };
 
   // 批准支出

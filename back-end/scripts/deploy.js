@@ -49,6 +49,13 @@ async function main() {
         const uniAddress = await mockUNI.getAddress();
         console.log("✅ UNI deployed successfully:", uniAddress);
         
+        // Deploy DAI
+        const MockDAI = await ethers.getContractFactory("MockDAI");
+        const mockDAI = await MockDAI.deploy(deployer.address);
+        await mockDAI.waitForDeployment();
+        const daiAddress = await mockDAI.getAddress();
+        console.log("✅ DAI deployed successfully:", daiAddress);
+        
         // 2. Deploy token factory contract
         console.log("\n📦 Deploying token factory contract...");
         const TokenFactory = await ethers.getContractFactory("TokenFactory");
@@ -65,6 +72,7 @@ async function main() {
         await tokenFactory.registerToken("WBTC", wbtcAddress);
         await tokenFactory.registerToken("LINK", linkAddress);
         await tokenFactory.registerToken("UNI", uniAddress);
+        await tokenFactory.registerToken("DAI", daiAddress);
         console.log("✅ All tokens registered successfully");
         
         deployedContracts.MockUSDC = usdcAddress;
@@ -72,6 +80,7 @@ async function main() {
         deployedContracts.MockWBTC = wbtcAddress;
         deployedContracts.MockLINK = linkAddress;
         deployedContracts.MockUNI = uniAddress;
+        deployedContracts.MockDAI = daiAddress;
         
         console.log("📍 Token addresses:");
         console.log("   USDC:", usdcAddress);
@@ -79,6 +88,7 @@ async function main() {
         console.log("   WBTC:", wbtcAddress);
         console.log("   LINK:", linkAddress);
         console.log("   UNI:", uniAddress);
+        console.log("   DAI:", daiAddress);
         
         // 3. Deploy fund contract
         console.log("\n🏦 Deploying fund contract...");
@@ -102,11 +112,12 @@ async function main() {
         // 4. Configure fund supported tokens
         console.log("\n⚙️ Configuring fund portfolio...");
         
-        // Add supported tokens and target allocations
+        // Add supported tokens and target allocations (50% USDC保留，其余50%分配给其他代币)
         const tokens = [
-            { address: wethAddress, allocation: 4000, name: "WETH" }, // 40%
-            { address: wbtcAddress, allocation: 3000, name: "WBTC" }, // 30%
-            { address: linkAddress, allocation: 2000, name: "LINK" }, // 20%
+            { address: wbtcAddress, allocation: 1000, name: "WBTC" }, // 10%
+            { address: wethAddress, allocation: 1000, name: "WETH" }, // 10%
+            { address: linkAddress, allocation: 1000, name: "LINK" }, // 10%
+            { address: daiAddress, allocation: 1000, name: "DAI" },   // 10%
             { address: uniAddress, allocation: 1000, name: "UNI" }    // 10%
         ];
         
@@ -167,6 +178,7 @@ async function main() {
         console.log(`  MOCK_WBTC: "${wbtcAddress}",`);
         console.log(`  MOCK_LINK: "${linkAddress}",`);
         console.log(`  MOCK_UNI: "${uniAddress}",`);
+        console.log(`  MOCK_DAI: "${daiAddress}",`);
         console.log(`  TOKEN_FACTORY: "${tokenFactoryAddress}"`);
         console.log("};\n");
         console.log(`export const NETWORK_ID = ${(await ethers.provider.getNetwork()).chainId};`);

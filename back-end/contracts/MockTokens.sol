@@ -153,6 +153,43 @@ contract MockUNI is ERC20, Ownable {
     }
 }
 
+contract MockDAI is ERC20, Ownable {
+    
+    event TokensMinted(address indexed to, uint256 amount);
+    
+    constructor(address _initialOwner) 
+        ERC20("Mock Dai Stablecoin", "DAI") 
+        Ownable(_initialOwner) 
+    {
+        require(_initialOwner != address(0), "Invalid owner address");
+        _mint(_initialOwner, 1000000 * 10**decimals()); // 1,000,000 DAI
+    }
+    
+    function decimals() public pure override returns (uint8) {
+        return 18;
+    }
+    
+    function mint(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "Cannot mint to zero address");
+        require(amount > 0, "Amount must be greater than zero");
+        _mint(to, amount);
+        emit TokensMinted(to, amount);
+    }
+    
+    function faucet(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(amount <= 10000 * 10**decimals(), "Amount too large"); // Maximum 10,000 DAI
+        _mint(msg.sender, amount);
+        emit TokensMinted(msg.sender, amount);
+    }
+    
+    function getTestTokens() external {
+        uint256 testAmount = 1000 * 10**decimals(); // 1000 DAI
+        _mint(msg.sender, testAmount);
+        emit TokensMinted(msg.sender, testAmount);
+    }
+}
+
 
 contract TokenFactory is Ownable {
     

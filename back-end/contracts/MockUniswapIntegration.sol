@@ -170,7 +170,7 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
     
     /**
      * @dev 模拟铸造或转移代币
-     * 在测试环境中，我们直接铸造代币给接收者
+     * 在测试环境中，我们优先使用已有的代币余额
      * @param _token 代币地址
      * @param _recipient 接收者地址
      * @param _amount 数量
@@ -180,19 +180,20 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
         address _recipient,
         uint256 _amount
     ) internal {
-        // 尝试调用代币的 mint 函数（如果存在）
+        // 首先检查合约是否有足够的代币余额
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        if (balance >= _amount) {
+            IERC20(_token).safeTransfer(_recipient, _amount);
+            return;
+        }
+        
+        // 如果余额不足，尝试调用代币的 mint 函数（如果存在）
         try this._callMint(_token, _recipient, _amount) {
             // 铸造成功
         } catch {
-            // 如果铸造失败，检查合约是否有足够的代币余额
-            uint256 balance = IERC20(_token).balanceOf(address(this));
-            if (balance >= _amount) {
-                IERC20(_token).safeTransfer(_recipient, _amount);
-            } else {
-                // 如果没有足够的代币，这是一个测试环境的限制
-                // 在真实环境中，这里应该从 Uniswap 池获取代币
-                revert("Insufficient token balance for mock swap");
-            }
+            // 如果铸造也失败，这是一个测试环境的限制
+            // 在真实环境中，这里应该从 Uniswap 池获取代币
+            revert("Insufficient token balance for mock swap");
         }
     }
     

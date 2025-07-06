@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
 import ConnectButton from '@/components/ui/ConnectButton';
+import BalanceChecker from '@/components/BalanceChecker';
 import { useMockFund } from '@/hooks/useMockFund';
 import { useMockUSDC } from '@/hooks/useMockUSDC';
 import { useFundShareToken } from '@/hooks/useFundShareToken';
+import { testCoinGeckoConnection } from '@/lib/testCoinGeckoApi';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
 import PortfolioAllocation from '@/components/PortfolioAllocation';
 import NAVChartWithCoinGecko from '@/components/NAVChartWithCoinGecko';
@@ -14,7 +16,6 @@ import PortfolioCharts from '@/components/PortfolioCharts';
 import DebugTokenData from '@/components/DebugTokenData';
 import CacheStatus from '@/components/CacheStatus';
 import CoinGeckoDebug from '@/components/CoinGeckoDebug';
-import { testCoinGeckoConnection } from '@/lib/testCoinGeckoApi';
 
 export default function Home() {
   // 获取当前连接的账户
@@ -36,6 +37,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
   const [isMounted, setIsMounted] = useState(false);
+  const [isClientReady, setIsClientReady] = useState(false);
   const [fundDataError, setFundDataError] = useState(false);
   const [isLoadingFundData, setIsLoadingFundData] = useState(false);
   const [apiTestResult, setApiTestResult] = useState<any>(null);
@@ -45,6 +47,7 @@ export default function Home() {
   // 客户端挂载检查
   useEffect(() => {
     setIsMounted(true);
+    setIsClientReady(true);
   }, []);
 
   // 加载用户数据
@@ -62,30 +65,47 @@ export default function Home() {
     setFundDataError(false);
     
     try {
+      console.log('开始加载用户数据，地址:', address);
+      
       // 获取USDC余额
+      console.log('正在获取USDC余额...');
       const usdcBalanceData = await mockUSDC.getBalance(address);
-      if (usdcBalanceData) {
-        setUsdcBalance(formatUnits(usdcBalanceData, 6));
+      console.log('USDC余额数据:', usdcBalanceData);
+      
+      if (usdcBalanceData !== null && usdcBalanceData !== undefined) {
+        const formattedBalance = formatUnits(usdcBalanceData, 6);
+        console.log('格式化后的USDC余额:', formattedBalance);
+        setUsdcBalance(formattedBalance);
       } else {
+        console.log('USDC余额为空，设置为0');
         setUsdcBalance('0');
       }
       
       // 获取份额余额
+      console.log('正在获取份额余额...');
       const shareBalanceData = await fundShareToken.getBalance(address);
-      if (shareBalanceData) {
-        setShareBalance(formatUnits(shareBalanceData, 18));
+      console.log('份额余额数据:', shareBalanceData);
+      
+      if (shareBalanceData !== null && shareBalanceData !== undefined) {
+        const formattedShareBalance = formatUnits(shareBalanceData, 18);
+        console.log('格式化后的份额余额:', formattedShareBalance);
+        setShareBalance(formattedShareBalance);
       } else {
+        console.log('份额余额为空，设置为0');
         setShareBalance('0');
       }
       
       // 刷新基金数据
+      console.log('刷新基金数据...');
       mockFund.refreshAllData();
+      
+      console.log('用户数据加载完成');
     } catch (error) {
       console.error('加载用户数据失败:', error);
       setFundDataError(true);
       setMessage({ 
         type: 'error', 
-        content: '网络连接不稳定，请稍后重试或检查网络设置' 
+        content: `加载数据失败: ${error.message || '网络连接不稳定，请稍后重试'}` 
       });
     } finally {
       setIsLoadingFundData(false);
@@ -175,12 +195,25 @@ export default function Home() {
     setMessage({ type: '', content: '' });
     
     try {
+      console.log('开始获取测试代币...');
       const result = await mockUSDC.getTestTokens();
+      console.log('获取测试代币结果:', result);
       
       if (result?.success) {
-        setMessage({ type: 'success', content: '获取测试代币成功！' });
-        // 重新加载数据
-        await loadUserData();
+        setMessage({ type: 'success', content: '获取测试代币交易已提交，等待确认...' });
+        
+        // 简化交易处理 - 直接等待一段时间后刷新余额
+         setMessage({ type: 'success', content: '交易已提交，正在等待确认...' });
+         
+         // 等待区块链处理交易（本地网络通常很快）
+         await new Promise(resolve => setTimeout(resolve, 3000));
+         
+         setMessage({ type: 'success', content: '正在刷新余额...' });
+         
+         // 重新加载数据
+         await loadUserData();
+         
+         setMessage({ type: 'success', content: '操作完成！如果余额未更新，请手动刷新页面。' });
       } else {
         throw new Error('获取测试代币失败');
       }
@@ -225,7 +258,7 @@ export default function Home() {
     // 避免水合错误，使用固定格式的时间字符串
     const formatTimestamp = (timestamp) => {
       if (!timestamp) return 'N/A';
-      if (!isMounted) return '加载中...';
+      if (!isMounted) return 'N/A'; // 在挂载前返回固定值
       try {
         return new Date(Number(timestamp) * 1000).toLocaleString('zh-CN', {
           year: 'numeric',
@@ -278,43 +311,55 @@ export default function Home() {
           </div>
         )}
 
-        {/* 用户信息 */}
+        {/* 用户信息和余额检查 */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
           <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">我的账户</h2>
           
-          {isConnected ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">钱包地址</p>
-                <p className="font-mono text-sm truncate">{address}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">USDC余额</p>
-                <p className="font-medium">{usdcBalance} USDC</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">基金份额</p>
-                <p className="font-medium">{shareBalance} {fundShareToken.symbol || 'MFS'}</p>
-              </div>
-              <div className="space-y-2">
-                <button
-                  onClick={handleGetTestTokens}
-                  disabled={isLoading || !isConnected}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  获取测试USDC
-                </button>
-                <button
-                  onClick={handleTestCoinGeckoApi}
-                  disabled={isTestingApi}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
-                >
-                  {isTestingApi ? '测试中...' : '测试 CoinGecko API'}
-                </button>
-              </div>
-            </div>
+          {!isMounted ? (
+            <p className="text-gray-500 dark:text-gray-400">加载中...</p>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400">请连接钱包查看账户信息</p>
+            <div className="space-y-4">
+              {/* 基本账户信息 */}
+              {isConnected && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">钱包地址</p>
+                    <p className="font-mono text-sm truncate">{address}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">基金份额</p>
+                    <p className="font-medium">{shareBalance} {fundShareToken.symbol || 'MFS'}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* 余额检查组件 */}
+              <BalanceChecker />
+              
+              {/* 操作按钮 */}
+              {isConnected && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleGetTestTokens}
+                    disabled={!isClientReady || isLoading || !isConnected}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    获取测试USDC
+                  </button>
+                  <button
+                    onClick={handleTestCoinGeckoApi}
+                    disabled={!isClientReady || isTestingApi}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
+                  >
+                    {isTestingApi ? '测试中...' : '测试 CoinGecko API'}
+                  </button>
+                </div>
+              )}
+              
+              {!isConnected && (
+                <p className="text-gray-500 dark:text-gray-400">请连接钱包查看账户信息</p>
+              )}
+            </div>
           )}
         </div>
 
@@ -444,7 +489,7 @@ export default function Home() {
                     value={investAmount}
                     onChange={(e) => setInvestAmount(e.target.value)}
                     placeholder="输入投资金额"
-                    disabled={!isConnected || isLoading}
+                    disabled={!isClientReady || !isConnected || isLoading}
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
@@ -452,7 +497,7 @@ export default function Home() {
               
               <button
                 onClick={handleInvest}
-                disabled={!isConnected || !investAmount || isLoading}
+                disabled={!isClientReady || !isConnected || !investAmount || isLoading}
                 className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? '处理中...' : '投资'}
@@ -476,7 +521,7 @@ export default function Home() {
                     value={redeemShares}
                     onChange={(e) => setRedeemShares(e.target.value)}
                     placeholder="输入赎回份额"
-                    disabled={!isConnected || isLoading}
+                    disabled={!isClientReady || !isConnected || isLoading}
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
@@ -484,7 +529,7 @@ export default function Home() {
               
               <button
                 onClick={handleRedeem}
-                disabled={!isConnected || !redeemShares || isLoading}
+                disabled={!isClientReady || !isConnected || !redeemShares || isLoading}
                 className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? '处理中...' : '赎回'}

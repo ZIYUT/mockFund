@@ -1,7 +1,9 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { parseUnits } from 'viem';
+import { readContract } from 'wagmi/actions';
+import { config } from '@/config/web3';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
 import MockUSDCABI from '@/contracts/abis/MockUSDC.json';
 
@@ -31,10 +33,10 @@ export function useMockUSDC() {
     
     for (let i = 0; i < retries; i++) {
       try {
-        // 使用 wagmi 的 readContract 函数
-        const { readContract } = await import('wagmi/actions');
-        const { config } = await import('@/config/web3');
+        console.log(`尝试获取USDC余额 (${i + 1}/${retries})，地址: ${address}`);
+        console.log('合约地址:', CONTRACT_ADDRESSES.MOCK_USDC);
         
+        // 使用 wagmi 的 readContract
         const data = await readContract(config, {
           address: CONTRACT_ADDRESSES.MOCK_USDC as `0x${string}`,
           abi: MockUSDCABI,
@@ -42,7 +44,8 @@ export function useMockUSDC() {
           args: [address],
         });
         
-        return data;
+        console.log('获取到的余额数据:', data);
+        return data as bigint;
       } catch (error) {
         console.warn(`获取USDC余额失败 (尝试 ${i + 1}/${retries}):`, error);
         
@@ -73,6 +76,8 @@ export function useMockUSDC() {
         abi: MockUSDCABI,
         functionName: 'approve',
         args: [spender, amountInWei],
+        gas: 100000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };
@@ -89,6 +94,8 @@ export function useMockUSDC() {
         address: CONTRACT_ADDRESSES.MOCK_USDC as `0x${string}`,
         abi: MockUSDCABI,
         functionName: 'getTestTokens',
+        gas: 100000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };

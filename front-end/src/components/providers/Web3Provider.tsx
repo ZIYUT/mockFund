@@ -3,7 +3,7 @@
 import { RainbowKitProvider, darkTheme, lightTheme } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { config, chains, rainbowConfig } from '@/config/web3';
+import { config, chains } from '@/config/web3';
 
 // 导入RainbowKit样式
 import '@rainbow-me/rainbowkit/styles.css';
@@ -24,10 +24,6 @@ export default function Web3Provider({ children }: Web3ProviderProps) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider 
-          chains={chains} 
-          appInfo={{
-            appName: rainbowConfig.appName,
-          }}
           theme={{
             lightMode: lightTheme(),
             darkMode: darkTheme(),

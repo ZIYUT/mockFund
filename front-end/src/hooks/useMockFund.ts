@@ -111,6 +111,8 @@ export function useMockFund() {
         abi: MockFundABI,
         functionName: 'invest',
         args: [amountInWei],
+        gas: 500000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };
@@ -133,6 +135,8 @@ export function useMockFund() {
         abi: MockFundABI,
         functionName: 'redeem',
         args: [sharesInWei],
+        gas: 500000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };

@@ -11,9 +11,9 @@ import { cacheManager } from '@/lib/cacheManager';
 const PORTFOLIO_TOKENS = getPortfolioTokenIds();
 
 export default function CoinGeckoDebug() {
-  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown>>({});
   const [isDebugging, setIsDebugging] = useState(false);
-  const [rawApiData, setRawApiData] = useState<any>({});
+  const [rawApiData, setRawApiData] = useState<Record<string, unknown>>({});
 
   const {
     prices,
@@ -21,13 +21,11 @@ export default function CoinGeckoDebug() {
     isLoading,
     hasError,
     error,
-    refetchPrices,
-    refetchHistorical,
   } = useCoinGeckoData(PORTFOLIO_TOKENS, 365);
 
   const runDebugCheck = async () => {
     setIsDebugging(true);
-    const debug: any = {
+    const debug: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       environment: {
         baseUrl: process.env.NEXT_PUBLIC_COINGECKO_BASE_URL,
@@ -71,7 +69,7 @@ export default function CoinGeckoDebug() {
             lastPoint: value[value.length - 1],
           };
           return acc;
-        }, {} as any),
+        }, {} as Record<string, unknown>),
       };
 
       setRawApiData({
@@ -93,7 +91,7 @@ export default function CoinGeckoDebug() {
   useEffect(() => {
     // 自动运行一次调试检查
     runDebugCheck();
-  }, []);
+  }, [runDebugCheck]);
 
   const clearCache = () => {
     cacheManager.clear();
@@ -223,7 +221,7 @@ export default function CoinGeckoDebug() {
               <div>
                 <span className="font-medium">历史价格样本 (最近7天):</span>
                 <div className="ml-4 space-y-1">
-                  {Object.entries(debugInfo.directApiCalls.historical?.sampleData || {}).map(([token, data]: [string, any]) => (
+                  {Object.entries(debugInfo.directApiCalls.historical?.sampleData || {}).map(([token, data]: [string, Record<string, unknown>]) => (
                     <div key={token} className="text-xs">
                       <span className="font-medium">{token}:</span> {data.dataPoints} 个数据点
                       {data.firstPoint && (

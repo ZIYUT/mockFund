@@ -10,7 +10,7 @@ import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
 import { formatUnits } from 'viem';
 
 // 基金初始配置
-const INITIAL_NAV = 1.0; // 1 USDC
+// const INITIAL_NAV = 1.0; // 1 USDC
 const CASH_ALLOCATION = 0.5; // 0.5 USDC 保持现金
 const TOKEN_ALLOCATION = 0.1; // 每种代币 0.1 USDC
 
@@ -24,13 +24,13 @@ const PORTFOLIO_TOKENS = [
 ];
 
 // 代币名称映射
-const TOKEN_NAMES: { [key: string]: string } = {
-  [CONTRACT_ADDRESSES.MOCK_WETH]: 'WETH',
-  [CONTRACT_ADDRESSES.MOCK_WBTC]: 'WBTC',
-  [CONTRACT_ADDRESSES.MOCK_LINK]: 'LINK',
-  [CONTRACT_ADDRESSES.MOCK_UNI]: 'UNI',
-  [CONTRACT_ADDRESSES.MOCK_DAI]: 'DAI',
-};
+// const TOKEN_NAMES: { [key: string]: string } = {
+//   [CONTRACT_ADDRESSES.MOCK_WETH]: 'WETH',
+//   [CONTRACT_ADDRESSES.MOCK_WBTC]: 'WBTC',
+//   [CONTRACT_ADDRESSES.MOCK_LINK]: 'LINK',
+//   [CONTRACT_ADDRESSES.MOCK_UNI]: 'UNI',
+//   [CONTRACT_ADDRESSES.MOCK_DAI]: 'DAI',
+// };
 
 interface NAVDataPoint {
   date: string;
@@ -48,7 +48,7 @@ export const NAVChart: React.FC = () => {
   const [navData, setNavData] = useState<NAVDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [initialPrices, setInitialPrices] = useState<{ [key: string]: number }>({});
+  const [, setInitialPrices] = useState<{ [key: string]: number }>({});
   
   // 获取当前代币价格
   const { prices, isLoading: isPricesLoading, error: pricesError, refetch } = useTokenPrices(PORTFOLIO_TOKENS);
@@ -162,7 +162,7 @@ export const NAVChart: React.FC = () => {
     if (prices && Object.keys(prices).length > 0) {
       generateNAVData();
     }
-  }, [prices]);
+  }, [prices, generateNAVData]);
 
   // 格式化日期显示
   const formatDate = (dateStr: string) => {

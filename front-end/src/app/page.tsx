@@ -32,7 +32,7 @@ export default function Home() {
   // 状态管理
   const [investAmount, setInvestAmount] = useState('');
   const [redeemShares, setRedeemShares] = useState('');
-  const [usdcBalance, setUsdcBalance] = useState('0');
+  const [, setUsdcBalance] = useState('0');
   const [shareBalance, setShareBalance] = useState('0');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
@@ -40,7 +40,7 @@ export default function Home() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [fundDataError, setFundDataError] = useState(false);
   const [isLoadingFundData, setIsLoadingFundData] = useState(false);
-  const [apiTestResult, setApiTestResult] = useState<any>(null);
+  const [apiTestResult, setApiTestResult] = useState<Record<string, unknown> | null>(null);
   const [isTestingApi, setIsTestingApi] = useState(false);
   // 移除数据源切换，只使用 CoinGecko
 
@@ -55,7 +55,7 @@ export default function Home() {
     if (isConnected && address) {
       loadUserData();
     }
-  }, [isConnected, address, mockFund.isConfirmed, mockUSDC.isConfirmed]);
+  }, [isConnected, address, mockFund.isConfirmed, mockUSDC.isConfirmed, loadUserData]);
 
   // 加载用户数据
   const loadUserData = async () => {
@@ -268,7 +268,7 @@ export default function Home() {
           minute: '2-digit',
           second: '2-digit'
         });
-      } catch (error) {
+      } catch (_) {
         return 'N/A';
       }
     };

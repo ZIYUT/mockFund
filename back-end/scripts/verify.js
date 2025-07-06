@@ -93,10 +93,32 @@ async function main() {
         console.error('⚠️ Error verifying TokenFactory:', error.message);
     }
     
+    // Verify PriceOracle
+    try {
+        console.log('\n🔎 Verifying PriceOracle...');
+        const command = `npx hardhat verify --network ${networkName} ${contracts.PriceOracle} "${deploymentInfo.deployer}"`;
+        console.log(`   Running: ${command}`);
+        execSync(command, { stdio: 'inherit' });
+        console.log('✅ PriceOracle verified successfully');
+    } catch (error) {
+        console.error('⚠️ Error verifying PriceOracle:', error.message);
+    }
+
+    // Verify UniswapIntegration
+    try {
+        console.log('\n🔎 Verifying UniswapIntegration...');
+        const command = `npx hardhat verify --network ${networkName} ${contracts.UniswapIntegration} "0xE592427A0AEce92De3Edee1F18E0157C05861564" "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6" "${deploymentInfo.deployer}"`;
+        console.log(`   Running: ${command}`);
+        execSync(command, { stdio: 'inherit' });
+        console.log('✅ UniswapIntegration verified successfully');
+    } catch (error) {
+        console.error('⚠️ Error verifying UniswapIntegration:', error.message);
+    }
+
     // Verify MockFund
     try {
         console.log('\n🔎 Verifying MockFund...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.MockFund} "Mock Fund Shares" "MFS" "${deploymentInfo.deployer}" "200"`;
+        const command = `npx hardhat verify --network ${networkName} ${contracts.MockFund} "Mock Fund Shares" "MFS" "${deploymentInfo.deployer}" "200" "${contracts.PriceOracle}" "${contracts.UniswapIntegration}"`;
         console.log(`   Running: ${command}`);
         execSync(command, { stdio: 'inherit' });
         console.log('✅ MockFund verified successfully');

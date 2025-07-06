@@ -90,14 +90,42 @@ async function main() {
         console.log("   UNI:", uniAddress);
         console.log("   DAI:", daiAddress);
         
-        // 3. Deploy fund contract
+        // 3. Deploy PriceOracle contract
+        console.log("\n🔮 Deploying PriceOracle contract...");
+        const PriceOracle = await ethers.getContractFactory("PriceOracle");
+        const priceOracle = await PriceOracle.deploy(deployer.address);
+        await priceOracle.waitForDeployment();
+        const priceOracleAddress = await priceOracle.getAddress();
+        deployedContracts.PriceOracle = priceOracleAddress;
+        console.log("✅ PriceOracle deployed successfully:", priceOracleAddress);
+        
+        // 4. Deploy UniswapIntegration contract
+        console.log("\n🦄 Deploying UniswapIntegration contract...");
+        // Sepolia Uniswap V3 addresses
+        const SEPOLIA_SWAP_ROUTER = "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E";
+        const SEPOLIA_QUOTER = "0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3";
+        
+        const UniswapIntegration = await ethers.getContractFactory("UniswapIntegration");
+        const uniswapIntegration = await UniswapIntegration.deploy(
+            SEPOLIA_SWAP_ROUTER,
+            SEPOLIA_QUOTER,
+            deployer.address
+        );
+        await uniswapIntegration.waitForDeployment();
+        const uniswapIntegrationAddress = await uniswapIntegration.getAddress();
+        deployedContracts.UniswapIntegration = uniswapIntegrationAddress;
+        console.log("✅ UniswapIntegration deployed successfully:", uniswapIntegrationAddress);
+        
+        // 5. Deploy fund contract
         console.log("\n🏦 Deploying fund contract...");
         const MockFund = await ethers.getContractFactory("MockFund");
         const mockFund = await MockFund.deploy(
             "Mock Fund Shares",  // Share token name
             "MFS",              // Share token symbol
             deployer.address,    // Initial owner
-            200                  // Management fee rate 2%
+            200,                 // Management fee rate 2%
+            priceOracleAddress,  // Price oracle address
+            uniswapIntegrationAddress // Uniswap integration address
         );
         await mockFund.waitForDeployment();
         const mockFundAddress = await mockFund.getAddress();
@@ -109,7 +137,7 @@ async function main() {
         deployedContracts.FundShareToken = shareTokenAddress;
         console.log("✅ FundShareToken address:", shareTokenAddress);
         
-        // 4. Configure fund supported tokens
+        // 6. Configure fund supported tokens
         console.log("\n⚙️ Configuring fund portfolio...");
         
         // Add supported tokens and target allocations (50% USDC保留，其余50%分配给其他代币)
@@ -127,13 +155,13 @@ async function main() {
             console.log(`✅ Added ${token.name}: ${token.allocation/100}% allocation`);
         }
         
-        // 5. Set USDC token address in MockFund contract
+        // 7. Set USDC token address in MockFund contract
         console.log("\n🔧 Setting USDC token address...");
         const setUSDCTx = await mockFund.setUSDCToken(usdcAddress);
         await setUSDCTx.wait();
         console.log("✅ USDC token address set successfully:", usdcAddress);
         
-        // 6. Verify deployment
+        // 8. Verify deployment
         console.log("\n🔍 Verifying deployment results...");
         const fundStats = await mockFund.getFundStats();
         console.log("📊 Fund statistics:");
@@ -144,7 +172,7 @@ async function main() {
         const supportedTokens = await mockFund.getSupportedTokens();
         console.log("🎯 Number of supported investment tokens:", supportedTokens.length);
         
-        // 7. Save deployment information
+        // 9. Save deployment information
         const deploymentInfo = {
             network: await ethers.provider.getNetwork(),
             deployer: deployer.address,
@@ -167,12 +195,14 @@ async function main() {
         
         console.log("\n💾 Deployment information saved to:", deploymentFile);
         
-        // 8. Output contract addresses needed for frontend
+        // 10. Output contract addresses needed for frontend
         console.log("\n📋 Frontend configuration information:");
         console.log("```javascript");
         console.log("export const CONTRACT_ADDRESSES = {");
         console.log(`  MOCK_FUND: "${mockFundAddress}",`);
         console.log(`  FUND_SHARE_TOKEN: "${shareTokenAddress}",`);
+        console.log(`  PRICE_ORACLE: "${priceOracleAddress}",`);
+        console.log(`  UNISWAP_INTEGRATION: "${uniswapIntegrationAddress}",`);
         console.log(`  MOCK_USDC: "${usdcAddress}",`);
         console.log(`  MOCK_WETH: "${wethAddress}",`);
         console.log(`  MOCK_WBTC: "${wbtcAddress}",`);
@@ -180,7 +210,7 @@ async function main() {
         console.log(`  MOCK_UNI: "${uniAddress}",`);
         console.log(`  MOCK_DAI: "${daiAddress}",`);
         console.log(`  TOKEN_FACTORY: "${tokenFactoryAddress}"`);
-        console.log("};\n");
+        console.log("};");
         console.log(`export const NETWORK_ID = ${(await ethers.provider.getNetwork()).chainId};`);
         console.log("```");
         

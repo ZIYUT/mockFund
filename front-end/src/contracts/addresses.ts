@@ -1,36 +1,48 @@
 // 合约地址配置文件
 // 部署合约后，将合约地址更新到此文件
-// 合约地址 - Sepolia 测试网已部署地址
-export const CONTRACT_ADDRESSES = {
-  // 主要合约 - 本地 Hardhat 网络地址
-  MOCK_FUND: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82", // Hardhat 本地部署地址
-  FUND_SHARE_TOKEN: "0x32467b43BFa67273FC7dDda0999Ee9A12F2AaA08", // Hardhat 本地部署地址
-  
-  // 新增合约 - 增强功能
-  PRICE_ORACLE: "0x5FbDB2315678afecb367f032d93F642f64180aa3", // 价格预言机合约
-  UNISWAP_INTEGRATION: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e", // Uniswap 集成合约
-  
-  // 代币合约 - 本地 Hardhat 网络地址
-  MOCK_USDC: "0x5FbDB2315678afecb367f032d93F642f64180aa3", // Hardhat 本地部署地址
-  MOCK_WETH: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", // Hardhat 本地部署地址
-  MOCK_WBTC: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0", // Hardhat 本地部署地址
-  MOCK_LINK: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9", // Hardhat 本地部署地址
-  MOCK_UNI: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9", // Hardhat 本地部署地址
-  MOCK_DAI: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707", // Hardhat 本地部署地址
-  
-  // 工厂合约 - 本地 Hardhat 网络地址
-  TOKEN_FACTORY: "0x0165878A594ca255338adfa4d48449f69242Eb8F" // Hardhat 本地部署地址
+
+// Hardhat 本地网络合约地址
+const HARDHAT_ADDRESSES = {
+  MOCK_FUND: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+  FUND_SHARE_TOKEN: "0x32467b43BFa67273FC7dDda0999Ee9A12F2AaA08",
+  PRICE_ORACLE: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  UNISWAP_INTEGRATION: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+  MOCK_USDC: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  MOCK_WETH: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  MOCK_WBTC: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  MOCK_LINK: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  MOCK_UNI: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+  MOCK_DAI: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+  TOKEN_FACTORY: "0x0165878A594ca255338adfa4d48449f69242Eb8F"
 };
 
-// 当前使用的网络ID (Hardhat 本地网络)
-export const NETWORK_ID = 31337;
+// Sepolia 测试网合约地址 (最新部署)
+const SEPOLIA_ADDRESSES = {
+  MOCK_FUND: "0x973596639Dd4312560666606c72Db7134d20b08a",
+  FUND_SHARE_TOKEN: "0xA0e19c2649bb980DDae0d9fD1743ECF310c87fc2",
+  PRICE_ORACLE: "0xb575e50897dA43F3d50fc021A0912E20D6827cdb",
+  UNISWAP_INTEGRATION: "0xFD98054a4Deed24e79949b98479AEfF14D81f765",
+  MOCK_USDC: "0xd393fF387969a6F213E691BC1B1915eA5F5442f5",
+  MOCK_WETH: "0x87F62a6bBfde7a7CC56b9D4960E71782b55c4e3b",
+  MOCK_WBTC: "0x6bE8137eC6548Ea903E651Cdb18d77C4F24AeF87",
+  MOCK_LINK: "0xd0daDcB06481eF4B094d8e0C1a4C27755118FAc4",
+  MOCK_UNI: "0x341C9Ed3788259b2cFc9E42F43b1d3A64263ebA2",
+  MOCK_DAI: "0x29E77582151E72C5d6f9B595d838de50159627d1",
+  TOKEN_FACTORY: "0xd2e0a71212A123c99B26b3a30EfeD58153B3AAf6"
+};
+
+// 当前使用的网络ID (默认使用 Sepolia 测试网)
+export const NETWORK_ID = 11155111;
+
+// 根据网络ID获取合约地址
+export const CONTRACT_ADDRESSES = NETWORK_ID === 31337 ? HARDHAT_ADDRESSES : SEPOLIA_ADDRESSES;
 
 // 支持的网络配置
 export const SUPPORTED_NETWORKS = {
-  [NETWORK_ID]: {
+  11155111: {
     name: 'Sepolia',
     rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
-    chainId: NETWORK_ID,
+    chainId: 11155111,
     blockExplorer: 'https://sepolia.etherscan.io',
   },
   31337: {
@@ -40,3 +52,13 @@ export const SUPPORTED_NETWORKS = {
     blockExplorer: 'http://localhost:8545',
   },
 };
+
+// 获取指定网络的合约地址
+export function getContractAddresses(chainId: number) {
+  return chainId === 31337 ? HARDHAT_ADDRESSES : SEPOLIA_ADDRESSES;
+}
+
+// 获取当前网络信息
+export function getCurrentNetwork() {
+  return SUPPORTED_NETWORKS[NETWORK_ID as keyof typeof SUPPORTED_NETWORKS];
+}

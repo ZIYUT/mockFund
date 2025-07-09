@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { formatUnits } from 'viem';
 import { useMockFund } from '@/hooks/useMockFund';
-import { usePriceOracle } from '@/hooks/usePriceOracle';
+// import { usePriceOracle } from '@/hooks/usePriceOracle';
 
 // 代币颜色配置
 const TOKEN_COLORS: { [key: string]: string } = {
@@ -83,13 +83,20 @@ export const PortfolioAllocation: React.FC = () => {
     supportedTokens,
     targetAllocations,
     currentAllocations,
-    tokenHoldings,
+    // tokenHoldings,
     portfolioBreakdown,
-    refreshAllData,
+    // refreshAllData,
     isLoading,
   } = useMockFund();
   
-  const [allocationData, setAllocationData] = useState<any[]>([]);
+  const [allocationData, setAllocationData] = useState<Array<{
+    symbol: string;
+    targetAllocation: number;
+    currentAllocation: number;
+    currentValue: number;
+    color: string;
+    description: string;
+  }>>([]);
   const [totalValue, setTotalValue] = useState(0);
   
   useEffect(() => {

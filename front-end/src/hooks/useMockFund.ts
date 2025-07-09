@@ -3,7 +3,10 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
-import MockFundABI from '@/contracts/abis/MockFund.json';
+import MockFundArtifact from '@/contracts/abis/MockFund.json';
+
+// 从artifact中提取ABI
+const MockFundABI = MockFundArtifact.abi as any[];
 
 /**
  * 使用MockFund合约的hook
@@ -30,6 +33,7 @@ export function useMockFund() {
     query: {
       retry: 3,
       retryDelay: 1000,
+      refetchInterval: 300000, // 5分钟轮询一次
     },
   });
 
@@ -38,6 +42,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getCurrentNAV',
+    query: {
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // 获取管理费率
@@ -45,6 +52,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'managementFeeRate',
+    query: {
+      refetchInterval: false, // 管理费率很少变化，禁用自动轮询
+    },
   });
 
   // 获取最后收费时间
@@ -52,6 +62,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'lastFeeCollectionTimestamp',
+    query: {
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // 获取支持的代币列表
@@ -59,6 +72,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getSupportedTokens',
+    query: {
+      refetchInterval: false, // 支持的代币列表很少变化，禁用自动轮询
+    },
   });
 
   // 获取USDC地址
@@ -66,6 +82,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getUSDCAddress',
+    query: {
+      refetchInterval: false, // USDC地址不会变化，禁用自动轮询
+    },
   });
 
   // 获取份额代币地址
@@ -73,6 +92,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'shareToken',
+    query: {
+      refetchInterval: false, // 份额代币地址不会变化，禁用自动轮询
+    },
   });
 
   // 获取当前投资组合分配
@@ -80,6 +102,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getCurrentAllocations',
+    query: {
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // 获取代币持有量
@@ -87,6 +112,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getTokenHoldings',
+    query: {
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // 获取投资组合详细信息
@@ -94,6 +122,9 @@ export function useMockFund() {
     address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
     abi: MockFundABI,
     functionName: 'getPortfolioBreakdown',
+    query: {
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // Rebalancing functionality removed
@@ -112,7 +143,7 @@ export function useMockFund() {
         functionName: 'invest',
         args: [amountInWei],
         gas: 500000n, // 设置gas限制
-        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
+        gasPrice: parseUnits('100', 'gwei'), // 设置gas价格，提高到100 gwei
       });
       
       return { success: true };
@@ -136,7 +167,7 @@ export function useMockFund() {
         functionName: 'redeem',
         args: [sharesInWei],
         gas: 500000n, // 设置gas限制
-        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
+        gasPrice: parseUnits('100', 'gwei'), // 设置gas价格，提高到100 gwei
       });
       
       return { success: true };
@@ -155,6 +186,8 @@ export function useMockFund() {
         address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
         abi: MockFundABI,
         functionName: 'collectManagementFee',
+        gas: 200000n, // 设置gas限制
+        gasPrice: parseUnits('100', 'gwei'), // 设置gas价格，提高到100 gwei
       });
       
       return { success: true };
@@ -174,6 +207,8 @@ export function useMockFund() {
         abi: MockFundABI,
         functionName: 'setUSDCToken',
         args: [tokenAddress],
+        gas: 100000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };
@@ -193,6 +228,8 @@ export function useMockFund() {
         abi: MockFundABI,
         functionName: 'addSupportedToken',
         args: [tokenAddress, allocation],
+        gas: 150000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };
@@ -212,6 +249,8 @@ export function useMockFund() {
         abi: MockFundABI,
         functionName: 'updateTargetAllocation',
         args: [tokenAddress, allocation],
+        gas: 100000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };
@@ -228,6 +267,8 @@ export function useMockFund() {
         address: CONTRACT_ADDRESSES.MOCK_FUND as `0x${string}`,
         abi: MockFundABI,
         functionName: isPaused ? 'unpause' : 'pause',
+        gas: 100000n, // 设置gas限制
+        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
       });
       
       return { success: true };

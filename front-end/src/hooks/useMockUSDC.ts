@@ -5,13 +5,18 @@ import { parseUnits } from 'viem';
 import { readContract } from 'wagmi/actions';
 import { config } from '@/config/web3';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
-import MockUSDCABI from '@/contracts/abis/MockUSDC.json';
+import MockUSDCArtifact from '@/contracts/abis/MockUSDC.json';
+
+// 从artifact中提取ABI
+const MockUSDCABI = MockUSDCArtifact.abi as any[];
 
 /**
  * 使用MockUSDC合约的hook
  * 提供与MockUSDC代币交互的函数
  */
 export function useMockUSDC() {
+  const { address: userAddress } = useAccount();
+  
   // 写入合约的hooks
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   
@@ -19,12 +24,16 @@ export function useMockUSDC() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = 
     useWaitForTransactionReceipt({ hash });
 
-  // 读取余额的hook
+  // 读取余额的hook - 只有当用户地址存在时才查询
   const { data: balanceData } = useReadContract({
     address: CONTRACT_ADDRESSES.MOCK_USDC as `0x${string}`,
     abi: MockUSDCABI,
     functionName: 'balanceOf',
-    args: [],
+    args: userAddress ? [userAddress] : undefined,
+    query: {
+      enabled: !!userAddress, // 只有当用户地址存在时才启用查询
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // 获取余额（带重试机制）
@@ -77,7 +86,7 @@ export function useMockUSDC() {
         functionName: 'approve',
         args: [spender, amountInWei],
         gas: 100000n, // 设置gas限制
-        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
+        gasPrice: parseUnits('100', 'gwei'), // 设置gas价格，提高到100 gwei
       });
       
       return { success: true };
@@ -95,7 +104,7 @@ export function useMockUSDC() {
         abi: MockUSDCABI,
         functionName: 'getTestTokens',
         gas: 100000n, // 设置gas限制
-        gasPrice: parseUnits('20', 'gwei'), // 设置gas价格
+        gasPrice: parseUnits('100', 'gwei'), // 设置gas价格，提高到100 gwei
       });
       
       return { success: true };

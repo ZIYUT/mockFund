@@ -161,7 +161,25 @@ async function main() {
         await setUSDCTx.wait();
         console.log("✅ USDC token address set successfully:", usdcAddress);
         
-        // 8. Verify deployment
+        // 8. 初始化基金
+        console.log("\n🏦 Initializing fund with 1M USDC...");
+        
+        // 给部署者铸造 100万 USDC
+        const mintUSDCTx = await mockUSDC.mint(deployer.address, ethers.parseUnits("1000000", 6));
+        await mintUSDCTx.wait();
+        console.log("✅ Minted 1M USDC to deployer");
+        
+        // 授权基金合约使用 USDC
+        const approveUSDCTx = await mockUSDC.approve(mockFundAddress, ethers.parseUnits("1000000", 6));
+        await approveUSDCTx.wait();
+        console.log("✅ Approved USDC for fund contract");
+        
+        // 初始化基金
+        const initializeTx = await mockFund.initializeFund(ethers.parseUnits("1000000", 6));
+        await initializeTx.wait();
+        console.log("✅ Fund initialized with 1M MFC");
+        
+        // 9. 验证部署
         console.log("\n🔍 Verifying deployment results...");
         const fundStats = await mockFund.getFundStats();
         console.log("📊 Fund statistics:");
@@ -172,7 +190,7 @@ async function main() {
         const supportedTokens = await mockFund.getSupportedTokens();
         console.log("🎯 Number of supported investment tokens:", supportedTokens.length);
         
-        // 9. Save deployment information
+        // 10. Save deployment information
         const deploymentInfo = {
             network: await ethers.provider.getNetwork(),
             deployer: deployer.address,
@@ -195,7 +213,7 @@ async function main() {
         
         console.log("\n💾 Deployment information saved to:", deploymentFile);
         
-        // 10. Output contract addresses needed for frontend
+        // 11. Output contract addresses needed for frontend
         console.log("\n📋 Frontend configuration information:");
         console.log("```javascript");
         console.log("export const CONTRACT_ADDRESSES = {");

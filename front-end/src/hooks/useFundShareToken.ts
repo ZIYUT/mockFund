@@ -2,7 +2,10 @@
 
 import { useReadContract } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
-import FundShareTokenABI from '@/contracts/abis/FundShareToken.json';
+import FundShareTokenArtifact from '@/contracts/abis/FundShareToken.json';
+
+// 从artifact中提取ABI
+const FundShareTokenABI = FundShareTokenArtifact.abi as any[];
 
 /**
  * 使用FundShareToken合约的hook
@@ -49,6 +52,9 @@ export function useFundShareToken() {
     address: CONTRACT_ADDRESSES.FUND_SHARE_TOKEN as `0x${string}`,
     abi: FundShareTokenABI,
     functionName: 'totalSupply',
+    query: {
+      refetchInterval: 300000, // 5分钟轮询一次
+    },
   });
 
   // 获取代币名称
@@ -56,6 +62,9 @@ export function useFundShareToken() {
     address: CONTRACT_ADDRESSES.FUND_SHARE_TOKEN as `0x${string}`,
     abi: FundShareTokenABI,
     functionName: 'name',
+    query: {
+      refetchInterval: false, // 代币名称不会变化，禁用轮询
+    },
   });
 
   // 获取代币符号
@@ -63,6 +72,9 @@ export function useFundShareToken() {
     address: CONTRACT_ADDRESSES.FUND_SHARE_TOKEN as `0x${string}`,
     abi: FundShareTokenABI,
     functionName: 'symbol',
+    query: {
+      refetchInterval: false, // 代币符号不会变化，禁用轮询
+    },
   });
 
   // 获取代币精度
@@ -70,6 +82,9 @@ export function useFundShareToken() {
     address: CONTRACT_ADDRESSES.FUND_SHARE_TOKEN as `0x${string}`,
     abi: FundShareTokenABI,
     functionName: 'decimals',
+    query: {
+      refetchInterval: false, // 代币精度不会变化，禁用轮询
+    },
   });
 
   return {

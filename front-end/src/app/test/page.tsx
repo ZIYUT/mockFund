@@ -5,7 +5,10 @@ import { useAccount, useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
 import ConnectButton from '@/components/ui/ConnectButton';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
-import MockUSDCABI from '@/contracts/abis/MockUSDC.json';
+import MockUSDCArtifact from '@/contracts/abis/MockUSDC.json';
+
+// 从artifact中提取ABI
+const MockUSDCABI = MockUSDCArtifact.abi as any[];
 import { useMockUSDC } from '@/hooks/useMockUSDC';
 
 export default function TestPage() {

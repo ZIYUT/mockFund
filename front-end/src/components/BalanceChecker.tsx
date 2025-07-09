@@ -3,7 +3,10 @@
 import { useAccount, useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
-import MockUSDCABI from '@/contracts/abis/MockUSDC.json';
+import MockUSDCArtifact from '@/contracts/abis/MockUSDC.json';
+
+// 从artifact中提取ABI
+const MockUSDCABI = MockUSDCArtifact.abi as any[];
 
 export default function BalanceChecker() {
   const { address, isConnected, chain } = useAccount();

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { getPortfolioTokenIds, TOKEN_DISPLAY_NAMES } from '@/lib/coinGeckoApi';
 const PORTFOLIO_TOKENS = getPortfolioTokenIds();
 
 // 基金配置
-const INITIAL_FUND_VALUE = 1.0; // 初始净值 1.0 USDC
+// const INITIAL_FUND_VALUE = 1.0; // 初始净值 1.0 USDC
 const CASH_ALLOCATION = 0.5; // 现金配置 50%
 const TOKEN_ALLOCATION = 0.1; // 每种代币配置 10%
 
@@ -27,7 +27,7 @@ const NAVChartWithCoinGecko: React.FC = () => {
   const [navData, setNavData] = useState<NAVDataPoint[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
-  const [initialPrices, setInitialPrices] = useState<Record<string, number>>({});
+  const [, setInitialPrices] = useState<Record<string, number>>({});
 
   // 使用 CoinGecko 数据
   const {
@@ -56,7 +56,7 @@ const NAVChartWithCoinGecko: React.FC = () => {
   };
 
   // 根据历史价格计算净值
-  const calculateNAVFromHistoricalData = () => {
+  const calculateNAVFromHistoricalData = useCallback(() => {
     if (!historicalPrices || Object.keys(historicalPrices).length === 0) {
       return;
     }
@@ -140,14 +140,14 @@ const NAVChartWithCoinGecko: React.FC = () => {
     } finally {
       setIsCalculating(false);
     }
-  };
+  }, [historicalPrices]);
 
   // 当历史价格数据更新时重新计算净值
   useEffect(() => {
     if (historicalPrices && Object.keys(historicalPrices).length > 0) {
       calculateNAVFromHistoricalData();
     }
-  }, [historicalPrices]);
+  }, [historicalPrices, calculateNAVFromHistoricalData]);
 
   // 格式化日期显示
   const formatDate = (dateStr: string) => {
@@ -156,7 +156,11 @@ const NAVChartWithCoinGecko: React.FC = () => {
   };
 
   // 自定义Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ value: number }>;
+    label?: string;
+  }) => {
     if (active && payload && payload.length) {
       const date = new Date(label);
       return (

@@ -18,6 +18,7 @@ export const config = getDefaultConfig({
     [sepolia.id]: http(SUPPORTED_NETWORKS[NETWORK_ID].rpcUrl),
     [hardhat.id]: http(SUPPORTED_NETWORKS[31337].rpcUrl),
   },
+  ssr: true, // 启用服务端渲染支持
 });
 
 // 导出支持的链

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
@@ -23,7 +23,7 @@ export default function CoinGeckoDebug() {
     error,
   } = useCoinGeckoData(PORTFOLIO_TOKENS, 365);
 
-  const runDebugCheck = async () => {
+  const runDebugCheck = useCallback(async () => {
     setIsDebugging(true);
     const debug: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
@@ -86,7 +86,7 @@ export default function CoinGeckoDebug() {
 
     setDebugInfo(debug);
     setIsDebugging(false);
-  };
+  }, [prices, historicalPrices, isLoading, hasError, error]);
 
   useEffect(() => {
     // 自动运行一次调试检查

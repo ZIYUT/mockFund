@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
 import ConnectButton from '@/components/ui/ConnectButton';
@@ -13,9 +13,10 @@ import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
 import PortfolioAllocation from '@/components/PortfolioAllocation';
 import NAVChartWithCoinGecko from '@/components/NAVChartWithCoinGecko';
 import PortfolioCharts from '@/components/PortfolioCharts';
-import DebugTokenData from '@/components/DebugTokenData';
-import CacheStatus from '@/components/CacheStatus';
-import CoinGeckoDebug from '@/components/CoinGeckoDebug';
+// 暂时移除调试组件的导入以避免CoinGecko API错误
+// import DebugTokenData from '@/components/DebugTokenData';
+// import CacheStatus from '@/components/CacheStatus';
+// import CoinGeckoDebug from '@/components/CoinGeckoDebug';
 
 export default function Home() {
   // 获取当前连接的账户
@@ -28,7 +29,7 @@ export default function Home() {
   
   // 从mockFund中获取基金统计信息
   const { fundStats, fundStatsError, isFundStatsLoading, managementFeeRate, lastFeeCollectionTimestamp } = mockFund;
-  
+
   // 状态管理
   const [investAmount, setInvestAmount] = useState('');
   const [redeemShares, setRedeemShares] = useState('');
@@ -36,6 +37,19 @@ export default function Home() {
   const [shareBalance, setShareBalance] = useState('0');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
+  
+  // 监听交易状态
+  useEffect(() => {
+    if (mockFund.isConfirmed && isLoading) {
+      setMessage({ type: 'success', content: '交易确认成功！' });
+      setIsLoading(false);
+      loadUserData();
+    }
+    if (mockFund.error && isLoading) {
+      setMessage({ type: 'error', content: `交易失败: ${mockFund.error.message}` });
+      setIsLoading(false);
+    }
+  }, [mockFund.isConfirmed, mockFund.error, isLoading]);
   const [isMounted, setIsMounted] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
   const [fundDataError, setFundDataError] = useState(false);
@@ -51,14 +65,7 @@ export default function Home() {
   }, []);
 
   // 加载用户数据
-  useEffect(() => {
-    if (isConnected && address) {
-      loadUserData();
-    }
-  }, [isConnected, address, mockFund.isConfirmed, mockUSDC.isConfirmed, loadUserData]);
-
-  // 加载用户数据
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!address) return;
     
     setIsLoadingFundData(true);
@@ -105,12 +112,29 @@ export default function Home() {
       setFundDataError(true);
       setMessage({ 
         type: 'error', 
-        content: `加载数据失败: ${error.message || '网络连接不稳定，请稍后重试'}` 
+        content: `加载数据失败: ${(error as Error).message || '网络连接不稳定，请稍后重试'}` 
       });
     } finally {
       setIsLoadingFundData(false);
     }
-  };
+  }, [address]); // 移除hook对象依赖，避免无限循环
+
+  // 加载用户数据
+  useEffect(() => {
+    if (isConnected && address) {
+      loadUserData();
+    }
+  }, [isConnected, address]); // 移除loadUserData依赖，避免无限循环
+
+  // 监听交易确认状态，仅在交易确认后刷新数据
+  useEffect(() => {
+    if (mockFund.isConfirmed || mockUSDC.isConfirmed) {
+      console.log('交易已确认，刷新用户数据');
+      if (isConnected && address) {
+        loadUserData();
+      }
+    }
+  }, [mockFund.isConfirmed, mockUSDC.isConfirmed, isConnected, address]); // 移除loadUserData依赖
 
   // 投资
   const handleInvest = async () => {
@@ -133,24 +157,20 @@ export default function Home() {
         throw new Error('批准USDC支出失败');
       }
       
-      // 等待批准交易确认
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      setMessage({ type: 'info', content: '批准成功，正在执行投资...' });
       
       // 执行投资
       const investResult = await mockFund.invest(investAmount);
       
       if (investResult?.success) {
-        setMessage({ type: 'success', content: '投资成功！' });
+        setMessage({ type: 'info', content: '投资交易已提交，等待确认...' });
         setInvestAmount('');
-        // 重新加载数据
-        await loadUserData();
       } else {
         throw new Error('投资失败');
       }
     } catch (error) {
       console.error('投资操作失败:', error);
-      setMessage({ type: 'error', content: `投资失败: ${error.message || '未知错误'}` });
-    } finally {
+      setMessage({ type: 'error', content: `投资失败: ${(error as Error).message || '未知错误'}` });
       setIsLoading(false);
     }
   };
@@ -169,17 +189,14 @@ export default function Home() {
       const redeemResult = await mockFund.redeem(redeemShares);
       
       if (redeemResult?.success) {
-        setMessage({ type: 'success', content: '赎回成功！' });
+        setMessage({ type: 'info', content: '赎回交易已提交，等待确认...' });
         setRedeemShares('');
-        // 重新加载数据
-        await loadUserData();
       } else {
         throw new Error('赎回失败');
       }
     } catch (error) {
       console.error('赎回操作失败:', error);
-      setMessage({ type: 'error', content: `赎回失败: ${error.message || '未知错误'}` });
-    } finally {
+      setMessage({ type: 'error', content: `赎回失败: ${(error as Error).message || '未知错误'}` });
       setIsLoading(false);
     }
   };
@@ -219,7 +236,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('获取测试代币失败:', error);
-      setMessage({ type: 'error', content: `获取测试代币失败: ${error.message || '未知错误'}` });
+      setMessage({ type: 'error', content: `获取测试代币失败: ${(error as Error).message || '未知错误'}` });
     } finally {
       setIsLoading(false);
     }
@@ -242,7 +259,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('API 测试失败:', error);
-      setMessage({ type: 'error', content: `API 测试失败: ${error.message || '未知错误'}` });
+      setMessage({ type: 'error', content: `API 测试失败: ${(error as Error).message || '未知错误'}` });
     } finally {
       setIsTestingApi(false);
     }
@@ -256,7 +273,7 @@ export default function Home() {
     const [totalAssets, totalShares, nav] = mockFund.fundStats;
     
     // 避免水合错误，使用固定格式的时间字符串
-    const formatTimestamp = (timestamp) => {
+    const formatTimestamp = (timestamp: bigint | undefined) => {
       if (!timestamp) return 'N/A';
       if (!isMounted) return 'N/A'; // 在挂载前返回固定值
       try {
@@ -268,7 +285,7 @@ export default function Home() {
           minute: '2-digit',
           second: '2-digit'
         });
-      } catch (_) {
+      } catch {
         return 'N/A';
       }
     };
@@ -363,71 +380,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* 基金信息 */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">基金信息</h2>
-            {(fundDataError || fundStatsError) && (
-              <button
-                onClick={() => {
-                  loadUserData();
-                  mockFund.refreshAllData();
-                }}
-                disabled={isLoadingFundData || isFundStatsLoading}
-                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-indigo-600 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              >
-                {(isLoadingFundData || isFundStatsLoading) ? '重试中...' : '重试'}
-              </button>
-            )}
-          </div>
-          
-          {!isMounted ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-              <p className="text-gray-500 dark:text-gray-400">初始化中...</p>
-            </div>
-          ) : isLoadingFundData || isFundStatsLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-              <p className="text-gray-500 dark:text-gray-400">加载基金信息中...</p>
-            </div>
-          ) : fundDataError || fundStatsError ? (
-            <div className="text-center py-4">
-              <p className="text-red-500 dark:text-red-400 mb-2">加载基金信息失败</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">请检查网络连接或稍后重试</p>
-              {fundStatsError && (
-                <p className="text-xs text-gray-400 mt-1">错误详情: {fundStatsError.message}</p>
-              )}
-            </div>
-          ) : fundStats ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">总资产</p>
-                <p className="font-medium">{formatFundStats().totalAssets} USDC</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">总份额</p>
-                <p className="font-medium">{formatFundStats().totalShares} {fundShareToken.symbol || 'MFS'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">当前NAV</p>
-                <p className="font-medium">{formatFundStats().nav} USDC</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">管理费率</p>
-                <p className="font-medium">{formatFundStats().managementFeeRate}%</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">最后收费时间</p>
-                <p className="font-medium">{formatFundStats().lastFeeCollectionTimestamp}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-              <p className="text-gray-500 dark:text-gray-400">加载基金信息中...</p>
-            </div>
-          )}        </div>
+        {/* 基金信息部分已暂时移除 */}
 
         {/* 投资组合配置 */}
         <div className="mb-6">
@@ -442,21 +395,6 @@ export default function Home() {
         {/* 投资组合图表 */}
         <div className="mb-6">
           <PortfolioCharts />
-        </div>
-
-        {/* 调试信息 */}
-        <div className="mb-6">
-          <DebugTokenData />
-        </div>
-
-        {/* 缓存状态 */}
-        <div className="mb-6">
-          <CacheStatus />
-        </div>
-
-        {/* CoinGecko 调试 */}
-        <div className="mb-6">
-          <CoinGeckoDebug />
         </div>
 
         {/* API 测试结果 */}

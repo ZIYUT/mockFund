@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -115,7 +115,7 @@ export const NAVChart: React.FC = () => {
   };
 
   // 生成净值数据
-  const generateNAVData = () => {
+  const generateNAVData = useCallback(() => {
     if (!prices || Object.keys(prices).length === 0) return;
     
     setIsLoading(true);
@@ -155,7 +155,7 @@ export const NAVChart: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [prices, setInitialPrices]);
 
   // 当价格数据更新时重新生成净值数据
   useEffect(() => {
@@ -171,7 +171,11 @@ export const NAVChart: React.FC = () => {
   };
 
   // 自定义Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ value: number }>;
+    label?: string;
+  }) => {
     if (active && payload && payload.length) {
       const date = new Date(label);
       return (

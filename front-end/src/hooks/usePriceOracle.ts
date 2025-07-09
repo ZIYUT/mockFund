@@ -5,7 +5,7 @@ import { CONTRACT_ADDRESSES } from '@/contracts/addresses';
 import PriceOracleArtifact from '@/contracts/abis/PriceOracle.json';
 
 // 从artifact中提取ABI
-const PriceOracleABI = PriceOracleArtifact.abi;
+const PriceOracleABI = PriceOracleArtifact.abi as any[];
 
 /**
  * 使用PriceOracle合约的hook
@@ -30,6 +30,7 @@ export function usePriceOracle() {
         enabled: !!tokenAddress,
         retry: 3,
         retryDelay: 1000,
+        refetchInterval: 300000, // 5分钟轮询一次价格
       },
     });
 
@@ -45,6 +46,7 @@ export function usePriceOracle() {
       args: [tokenAddress],
       query: {
         enabled: !!tokenAddress,
+        refetchInterval: false, // 代币小数位数不会变化，禁用轮询
       },
     });
 
@@ -62,6 +64,7 @@ export function usePriceOracle() {
         enabled: tokenAddresses && tokenAddresses.length > 0,
         retry: 3,
         retryDelay: 1000,
+        refetchInterval: 300000, // 5分钟轮询一次批量价格
       },
     });
 
@@ -80,6 +83,7 @@ export function usePriceOracle() {
       args: [tokenAddress, amount],
       query: {
         enabled: !!tokenAddress && !!amount,
+        refetchInterval: false, // 按需计算，禁用自动轮询
       },
     });
 
@@ -95,6 +99,7 @@ export function usePriceOracle() {
       args: [tokenAddress],
       query: {
         enabled: !!tokenAddress,
+        refetchInterval: false, // 价格源设置状态不经常变化，禁用轮询
       },
     });
 

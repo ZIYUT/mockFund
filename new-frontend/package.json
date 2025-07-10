@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "sync-addresses": "node scripts/sync-addresses.js",
-    "deploy:sepolia": "cd ../back-end && npx hardhat run scripts/deploy-sepolia.js --network sepolia",
+    "sync-sepolia": "node scripts/sync-sepolia-addresses.js",
+    "deploy:sepolia": "cd ../back-end && npx hardhat run scripts/deploy-with-real-prices.js --network sepolia",
     "deploy:local": "cd ../back-end && npx hardhat run scripts/deploy.js --network localhost"
   },
   "dependencies": {

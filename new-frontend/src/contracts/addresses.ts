@@ -1,75 +1,18 @@
-// 本文件由 scripts/sync-addresses.js 自动生成，请勿手动修改
+// 自动生成的合约地址配置
+// 部署时间: 2025-07-10T16:04:36.885Z
+// 网络: sepolia
+
 export const CONTRACT_ADDRESSES = {
-  31337: {
-    MOCK_FUND: '0x0B306BF915C4d645ff596e518fAf3F9669b97016',
-    FUND_SHARE_TOKEN: '0x524F04724632eED237cbA3c37272e018b3A7967e',
-    PRICE_ORACLE: '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82',
-    UNISWAP_INTEGRATION: '0x9A676e781A523b5d0C0e43731313A708CB607508',
-    MOCK_USDC: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    MOCK_WETH: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
-    MOCK_WBTC: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
-    MOCK_LINK: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
-    MOCK_UNI: '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9',
-    MOCK_DAI: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
-    TOKEN_FACTORY: '0x0165878A594ca255338adfa4d48449f69242Eb8F'
-  },
-  11155111: { // Sepolia
-    MOCK_FUND: '0x9FFf9baC956Ad4B0cc7274DF771842FaB209Fc26',
-    FUND_SHARE_TOKEN: '0xeC2C6B5bA66F7dC1D0bBdD0Fb0807d0359F7F9aa',
-    PRICE_ORACLE: '0x973872d8a7BC25561192a3E5fB4Dc7394dea5Cc3',
-    UNISWAP_INTEGRATION: '0x0B4e731b9C8d565b6AECb71F6e2f47AE833FF883',
-    MOCK_USDC: '0x78F2e11D378ACb3B594F2810479977fB55A8F9a6',
-    MOCK_WETH: '0x4818751B4565a089C674950E6824e5CB2ea4e2C8',
-    MOCK_WBTC: '0x9f9F55D6e764c621B77354C04C7eA0E5e804B4bf',
-    MOCK_LINK: '0x2358c713E3b69E0611fFC3d53Eae76f3B01CE2c0',
-    MOCK_UNI: '0xa7f0F050571c8E7E2EED037fa450dFd6EB80B27f',
-    MOCK_DAI: '0x5AB35D51A17644623382fBc5962f6A730CcD9cb0',
-    TOKEN_FACTORY: '0x499eE1bc21482CCfac2c7210F598E69B3C562C42'
-  }
+  MockUSDC: "0x5aA5F9d612280f553310966a461A200DCaeF1ce5",
+  MockFund: "0xB13eb6DAc1d4306402142b416Eda581871538621",
+  FundShareToken: "0x04e07b7A2138A5192583A3491817eaFfD02CDA50",
+  ChainlinkPriceOracle: "0x16018E1a3d92eDD9C939C4885B2C690f33d0a3bF",
+  UniswapIntegration: "0x449E05b43a522DbF421D54a6cB23Fe91c0147E62",
+  MockTokensFactory: "0x31E77f1dA22acc1ac62D4bD33ac7cD2cc27aefA6",
+  WETH: "0xf6dccE145e44463d1Bc82974383015aF3A115aD5",
+  WBTC: "0x6A3d9b277C807f35eF12DD94c13f903fA31864Cd",
+  LINK: "0xb74720FFFd322F11092deBf197df7CEa3b6824bD",
+  DAI: "0x77E0Aa7b8e9Fa0e7a908f3b7cFaF86286E713C6D"
 } as const;
 
-export function getContractAddress(contractName: keyof typeof CONTRACT_ADDRESSES[31337], chainId: number = 11155111): string {
-  const addresses = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
-  if (!addresses) throw new Error('Unsupported chain ID: ' + chainId);
-  return addresses[contractName];
-}
-
-// 支持的代币列表
-export const SUPPORTED_TOKENS = {
-  USDC: {
-    symbol: 'USDC',
-    name: 'Mock USD Coin',
-    decimals: 6,
-    address: '0x78F2e11D378ACb3B594F2810479977fB55A8F9a6' // Sepolia 地址
-  },
-  WETH: {
-    symbol: 'WETH',
-    name: 'Mock Wrapped Ether',
-    decimals: 18,
-    address: '0x4818751B4565a089C674950E6824e5CB2ea4e2C8' // Sepolia 地址
-  },
-  WBTC: {
-    symbol: 'WBTC',
-    name: 'Mock Wrapped Bitcoin',
-    decimals: 8,
-    address: '0x9f9F55D6e764c621B77354C04C7eA0E5e804B4bf' // Sepolia 地址
-  },
-  LINK: {
-    symbol: 'LINK',
-    name: 'Mock Chainlink Token',
-    decimals: 18,
-    address: '0x2358c713E3b69E0611fFC3d53Eae76f3B01CE2c0' // Sepolia 地址
-  },
-  UNI: {
-    symbol: 'UNI',
-    name: 'Mock Uniswap Token',
-    decimals: 18,
-    address: '0xa7f0F050571c8E7E2EED037fa450dFd6EB80B27f' // Sepolia 地址
-  },
-  DAI: {
-    symbol: 'DAI',
-    name: 'Mock Dai Stablecoin',
-    decimals: 18,
-    address: '0x5AB35D51A17644623382fBc5962f6A730CcD9cb0' // Sepolia 地址
-  }
-};
+export type ContractAddresses = typeof CONTRACT_ADDRESSES;

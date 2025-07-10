@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./FundShareToken.sol";
-import "./PriceOracle.sol";
-import "./MockUniswapIntegration.sol";
+import "./ChainlinkPriceOracle.sol";
+import "./UniswapIntegration.sol";
 
 contract MockFund is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -23,8 +23,8 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
 
     // 状态变量
     FundShareToken public immutable shareToken;
-    PriceOracle public immutable priceOracle;
-    MockUniswapIntegration public immutable uniswapIntegration;
+    ChainlinkPriceOracle public immutable priceOracle;
+    UniswapIntegration public immutable uniswapIntegration;
     
     address public usdcToken;
     address[] public supportedTokens;
@@ -57,8 +57,8 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         require(_uniswapIntegration != address(0), "Invalid uniswap integration");
         
         shareToken = new FundShareToken(_shareTokenName, _shareTokenSymbol, address(this));
-        priceOracle = PriceOracle(_priceOracle);
-        uniswapIntegration = MockUniswapIntegration(_uniswapIntegration);
+        priceOracle = ChainlinkPriceOracle(_priceOracle);
+        uniswapIntegration = UniswapIntegration(_uniswapIntegration);
         managementFeeRate = _managementFeeRate;
         lastFeeCollection = block.timestamp;
     }
@@ -142,12 +142,11 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
      */
     function calculateMFCValue() public view returns (uint256 mfcValue) {
         require(isInitialized, "Fund not initialized");
-        
         uint256 totalSupply = shareToken.totalSupply();
         if (totalSupply == 0) return 0;
-        
         uint256 nav = calculateNAV();
-        mfcValue = nav / totalSupply;
+        // 修正精度：nav(6位) * 1e18 / totalSupply(18位)
+        mfcValue = (nav * 1e18) / totalSupply;
     }
 
     /**

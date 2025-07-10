@@ -59,37 +59,58 @@ async function main() {
     console.log("   LINK:", linkAddress);
     console.log("   DAI:", daiAddress);
 
-    // 4. 部署 PriceOracle
-    console.log("\n4️⃣ 部署 PriceOracle...");
-    const PriceOracle = await ethers.getContractFactory("PriceOracle");
-    const priceOracle = await PriceOracle.deploy(deployer.address);
-    await priceOracle.waitForDeployment();
-    const priceOracleAddress = await priceOracle.getAddress();
-    deployedContracts.PriceOracle = priceOracleAddress;
-    console.log("✅ PriceOracle 部署成功:", priceOracleAddress);
+    // 4. 部署 ChainlinkPriceOracle
+    console.log("\n4️⃣ 部署 ChainlinkPriceOracle...");
+    const ChainlinkPriceOracle = await ethers.getContractFactory("ChainlinkPriceOracle");
+    const chainlinkPriceOracle = await ChainlinkPriceOracle.deploy(deployer.address);
+    await chainlinkPriceOracle.waitForDeployment();
+    const chainlinkPriceOracleAddress = await chainlinkPriceOracle.getAddress();
+    deployedContracts.ChainlinkPriceOracle = chainlinkPriceOracleAddress;
+    console.log("✅ ChainlinkPriceOracle 部署成功:", chainlinkPriceOracleAddress);
 
-    // 5. 部署 MockUniswapIntegration
-    console.log("\n5️⃣ 部署 MockUniswapIntegration...");
-    const MockUniswapIntegration = await ethers.getContractFactory("MockUniswapIntegration");
-    const mockUniswapIntegration = await MockUniswapIntegration.deploy(
+    // 5. 配置 Chainlink 价格预言机
+    console.log("\n5️⃣ 配置 Chainlink 价格预言机...");
+    
+    // Sepolia 测试网上的 Chainlink 价格预言机地址
+    const sepoliaPriceFeeds = {
+      "ETH": "0x694AA1769357215DE4FAC081bf1f309aDC325306", // ETH/USD
+      "BTC": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43", // BTC/USD
+      "LINK": "0xc59E3633BAAC79493d908e63626716e204A45EdF", // LINK/USD
+      "USDC": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E", // USDC/USD
+      "DAI": "0x14866185B1962B63C3Ea9E03Bc1da838bab34C19"   // DAI/USD
+    };
+    
+    // 设置价格预言机
+    await chainlinkPriceOracle.setPriceFeed(wethAddress, sepoliaPriceFeeds.ETH, "ETH");
+    await chainlinkPriceOracle.setPriceFeed(wbtcAddress, sepoliaPriceFeeds.BTC, "BTC");
+    await chainlinkPriceOracle.setPriceFeed(linkAddress, sepoliaPriceFeeds.LINK, "LINK");
+    await chainlinkPriceOracle.setPriceFeed(usdcAddress, sepoliaPriceFeeds.USDC, "USDC");
+    await chainlinkPriceOracle.setPriceFeed(daiAddress, sepoliaPriceFeeds.DAI, "DAI");
+    
+    console.log("✅ Chainlink 价格预言机配置完成");
+
+    // 6. 部署 UniswapIntegration
+    console.log("\n6️⃣ 部署 UniswapIntegration...");
+    const UniswapIntegration = await ethers.getContractFactory("UniswapIntegration");
+    const uniswapIntegration = await UniswapIntegration.deploy(
       deployer.address,
-      priceOracleAddress
+      chainlinkPriceOracleAddress
     );
-    await mockUniswapIntegration.waitForDeployment();
-    const mockUniswapIntegrationAddress = await mockUniswapIntegration.getAddress();
-    deployedContracts.MockUniswapIntegration = mockUniswapIntegrationAddress;
-    console.log("✅ MockUniswapIntegration 部署成功:", mockUniswapIntegrationAddress);
+    await uniswapIntegration.waitForDeployment();
+    const uniswapIntegrationAddress = await uniswapIntegration.getAddress();
+    deployedContracts.UniswapIntegration = uniswapIntegrationAddress;
+    console.log("✅ UniswapIntegration 部署成功:", uniswapIntegrationAddress);
 
-    // 6. 部署 MockFund
-    console.log("\n6️⃣ 部署 MockFund...");
+    // 7. 部署 MockFund
+    console.log("\n7️⃣ 部署 MockFund...");
     const MockFund = await ethers.getContractFactory("MockFund");
     const mockFund = await MockFund.deploy(
       "Mock Fund Shares",  // Share token name
-      "MFS",              // Share token symbol
+      "MFC",              // Share token symbol
       deployer.address,    // Initial owner
       100,                 // Management fee rate 1%
-      priceOracleAddress,  // Price oracle address
-      mockUniswapIntegrationAddress // MockUniswap integration address
+      chainlinkPriceOracleAddress,  // ChainlinkPriceOracle address
+      uniswapIntegrationAddress // UniswapIntegration address
     );
     await mockFund.waitForDeployment();
     const mockFundAddress = await mockFund.getAddress();
@@ -101,8 +122,8 @@ async function main() {
     deployedContracts.FundShareToken = shareTokenAddress;
     console.log("✅ FundShareToken 地址:", shareTokenAddress);
 
-    // 7. 配置基金支持的代币
-    console.log("\n7️⃣ 配置基金投资组合...");
+    // 8. 配置基金支持的代币
+    console.log("\n8️⃣ 配置基金投资组合...");
     
     // 添加支持的代币（各占12.5%，总共50%）
     const tokens = [
@@ -118,14 +139,14 @@ async function main() {
       console.log(`✅ 添加 ${token.name}: ${token.allocation/100}% 分配`);
     }
 
-    // 8. 设置 USDC 代币地址
-    console.log("\n8️⃣ 设置 USDC 代币地址...");
+    // 9. 设置 USDC 代币地址
+    console.log("\n9️⃣ 设置 USDC 代币地址...");
     const setUSDCTx = await mockFund.setUSDCToken(usdcAddress);
     await setUSDCTx.wait();
     console.log("✅ USDC 代币地址设置成功:", usdcAddress);
 
-    // 9. 为 MockUniswapIntegration 预存代币
-    console.log("\n9️⃣ 为 MockUniswapIntegration 预存代币...");
+    // 10. 为 UniswapIntegration 预存代币
+    console.log("\n🔟 为 UniswapIntegration 预存代币...");
     
     // 获取代币合约实例
     const MockWETH = await ethers.getContractFactory("MockWETH");
@@ -140,25 +161,19 @@ async function main() {
 
     // 预存大量代币用于交换
     const largeAmount = ethers.parseUnits("1000000", 18); // 1M tokens
-    await mockWETH.mint(mockUniswapIntegrationAddress, largeAmount);
-    await mockWBTC.mint(mockUniswapIntegrationAddress, ethers.parseUnits("10000", 8)); // 10K WBTC
-    await mockLINK.mint(mockUniswapIntegrationAddress, largeAmount);
-    await mockDAI.mint(mockUniswapIntegrationAddress, largeAmount);
+    await mockWETH.mint(uniswapIntegrationAddress, largeAmount);
+    await mockWBTC.mint(uniswapIntegrationAddress, ethers.parseUnits("10000", 8)); // 10K WBTC
+    await mockLINK.mint(uniswapIntegrationAddress, largeAmount);
+    await mockDAI.mint(uniswapIntegrationAddress, largeAmount);
     
     // 为USDC铸造代币给Uniswap集成
     const usdcAmount = ethers.parseUnits("1000000", 6); // 1M USDC
-    await mockUSDC.mint(mockUniswapIntegrationAddress, usdcAmount);
+    await mockUSDC.mint(uniswapIntegrationAddress, usdcAmount);
     
-    // 设置简单的交换比率（1:1）
-    await mockUniswapIntegration.setExchangeRate(usdcAddress, wethAddress, 10000);
-    await mockUniswapIntegration.setExchangeRate(usdcAddress, wbtcAddress, 10000);
-    await mockUniswapIntegration.setExchangeRate(usdcAddress, linkAddress, 10000);
-    await mockUniswapIntegration.setExchangeRate(usdcAddress, daiAddress, 10000);
-    
-    console.log("✅ MockUniswapIntegration 预存和配置完成");
+    console.log("✅ UniswapIntegration 预存完成");
 
-    // 10. 初始化基金
-    console.log("\n🔟 初始化基金...");
+    // 11. 初始化基金
+    console.log("\n1️⃣1️⃣ 初始化基金...");
     
     // 给部署者铸造 100万 USDC
     const initialAmount = ethers.parseUnits("1000000", 6); // 100万 USDC
@@ -173,7 +188,7 @@ async function main() {
     await mockFund.initializeFund(initialAmount);
     console.log("✅ 基金初始化完成，铸造 100万 MFC");
 
-    // 11. 保存部署信息
+    // 12. 保存部署信息
     console.log("\n📝 保存部署信息...");
     
     const deploymentInfo = {
@@ -193,7 +208,7 @@ async function main() {
     fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
     console.log("✅ 部署信息已保存到:", deploymentFile);
 
-    // 12. 输出部署结果
+    // 13. 输出部署结果
     console.log("\n🎉 部署完成！");
     console.log("=== 合约地址 ===");
     Object.entries(deployedContracts).forEach(([name, address]) => {

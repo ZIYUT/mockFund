@@ -38,76 +38,32 @@ async function main() {
         console.error('⚠️ Error verifying MockUSDC:', error.message);
     }
     
-    // Verify MockWETH
+    // Verify MockTokensFactory
     try {
-        console.log('\n🔎 Verifying MockWETH...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.MockWETH} "${deploymentInfo.deployer}"`;
+        console.log('\n🔎 Verifying MockTokensFactory...');
+        const command = `npx hardhat verify --network ${networkName} ${contracts.MockTokensFactory} "${deploymentInfo.deployer}"`;
         console.log(`   Running: ${command}`);
         execSync(command, { stdio: 'inherit' });
-        console.log('✅ MockWETH verified successfully');
+        console.log('✅ MockTokensFactory verified successfully');
     } catch (error) {
-        console.error('⚠️ Error verifying MockWETH:', error.message);
+        console.error('⚠️ Error verifying MockTokensFactory:', error.message);
     }
     
-    // Verify MockWBTC
+    // Verify ChainlinkPriceOracle
     try {
-        console.log('\n🔎 Verifying MockWBTC...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.MockWBTC} "${deploymentInfo.deployer}"`;
+        console.log('\n🔎 Verifying ChainlinkPriceOracle...');
+        const command = `npx hardhat verify --network ${networkName} ${contracts.ChainlinkPriceOracle} "${deploymentInfo.deployer}"`;
         console.log(`   Running: ${command}`);
         execSync(command, { stdio: 'inherit' });
-        console.log('✅ MockWBTC verified successfully');
+        console.log('✅ ChainlinkPriceOracle verified successfully');
     } catch (error) {
-        console.error('⚠️ Error verifying MockWBTC:', error.message);
-    }
-    
-    // Verify MockLINK
-    try {
-        console.log('\n🔎 Verifying MockLINK...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.MockLINK} "${deploymentInfo.deployer}"`;
-        console.log(`   Running: ${command}`);
-        execSync(command, { stdio: 'inherit' });
-        console.log('✅ MockLINK verified successfully');
-    } catch (error) {
-        console.error('⚠️ Error verifying MockLINK:', error.message);
-    }
-    
-    // Verify MockUNI
-    try {
-        console.log('\n🔎 Verifying MockUNI...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.MockUNI} "${deploymentInfo.deployer}"`;
-        console.log(`   Running: ${command}`);
-        execSync(command, { stdio: 'inherit' });
-        console.log('✅ MockUNI verified successfully');
-    } catch (error) {
-        console.error('⚠️ Error verifying MockUNI:', error.message);
-    }
-    
-    // Verify TokenFactory
-    try {
-        console.log('\n🔎 Verifying TokenFactory...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.TokenFactory} "${deploymentInfo.deployer}"`;
-        console.log(`   Running: ${command}`);
-        execSync(command, { stdio: 'inherit' });
-        console.log('✅ TokenFactory verified successfully');
-    } catch (error) {
-        console.error('⚠️ Error verifying TokenFactory:', error.message);
-    }
-    
-    // Verify PriceOracle
-    try {
-        console.log('\n🔎 Verifying PriceOracle...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.PriceOracle} "${deploymentInfo.deployer}"`;
-        console.log(`   Running: ${command}`);
-        execSync(command, { stdio: 'inherit' });
-        console.log('✅ PriceOracle verified successfully');
-    } catch (error) {
-        console.error('⚠️ Error verifying PriceOracle:', error.message);
+        console.error('⚠️ Error verifying ChainlinkPriceOracle:', error.message);
     }
 
     // Verify UniswapIntegration
     try {
         console.log('\n🔎 Verifying UniswapIntegration...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.UniswapIntegration} "0xE592427A0AEce92De3Edee1F18E0157C05861564" "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6" "${deploymentInfo.deployer}"`;
+        const command = `npx hardhat verify --network ${networkName} ${contracts.UniswapIntegration} "${deploymentInfo.deployer}" "${contracts.ChainlinkPriceOracle}"`;
         console.log(`   Running: ${command}`);
         execSync(command, { stdio: 'inherit' });
         console.log('✅ UniswapIntegration verified successfully');
@@ -118,7 +74,7 @@ async function main() {
     // Verify MockFund
     try {
         console.log('\n🔎 Verifying MockFund...');
-        const command = `npx hardhat verify --network ${networkName} ${contracts.MockFund} "Mock Fund Shares" "MFS" "${deploymentInfo.deployer}" "200" "${contracts.PriceOracle}" "${contracts.UniswapIntegration}"`;
+        const command = `npx hardhat verify --network ${networkName} ${contracts.MockFund} "Mock Fund Shares" "MFC" "${deploymentInfo.deployer}" "100" "${contracts.ChainlinkPriceOracle}" "${contracts.UniswapIntegration}"`;
         console.log(`   Running: ${command}`);
         execSync(command, { stdio: 'inherit' });
         console.log('✅ MockFund verified successfully');
@@ -129,6 +85,8 @@ async function main() {
     // Note: FundShareToken is deployed by MockFund, so it's more complex to verify
     console.log('\n⚠️ Note: FundShareToken is deployed by the MockFund contract and requires manual verification');
     console.log(`   FundShareToken address: ${contracts.FundShareToken}`);
+    console.log('   Manual verification command:');
+    console.log(`   npx hardhat verify --network ${networkName} ${contracts.FundShareToken} "Mock Fund Shares" "MFC" "${contracts.MockFund}"`);
     
     console.log('\n🎉 Verification process completed!');
 }

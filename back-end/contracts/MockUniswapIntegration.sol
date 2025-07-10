@@ -5,17 +5,20 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./PriceOracle.sol";
 
 /**
  * @title MockUniswapIntegration
- * @dev 模拟 Uniswap 集成，用于测试目的
- * 这个合约模拟代币交换，不依赖真实的 Uniswap 池
+ * @dev Sepolia测试网模拟 Uniswap 集成，基于真实价格计算交换比率
  */
 contract MockUniswapIntegration is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     
     // 模拟交换比率（基点）
     mapping(address => mapping(address => uint256)) public exchangeRates;
+    
+    // 价格预言机引用
+    PriceOracle public priceOracle;
     
     // 默认交换比率（1:1）
     uint256 public constant DEFAULT_RATE = 10000; // 100% in basis points
@@ -34,11 +37,71 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
         address indexed tokenOut,
         uint256 rate
     );
+    event PriceOracleUpdated(address indexed oldOracle, address indexed newOracle);
     
-    constructor(address _initialOwner) Ownable(_initialOwner) {}
+    constructor(address _initialOwner, address _priceOracle) Ownable(_initialOwner) {
+        require(_priceOracle != address(0), "Invalid price oracle address");
+        priceOracle = PriceOracle(_priceOracle);
+    }
     
     /**
-     * @dev 设置代币对的交换比率
+     * @dev 设置价格预言机
+     * @param _priceOracle 新的价格预言机地址
+     */
+    function setPriceOracle(address _priceOracle) external onlyOwner {
+        require(_priceOracle != address(0), "Invalid price oracle address");
+        address oldOracle = address(priceOracle);
+        priceOracle = PriceOracle(_priceOracle);
+        emit PriceOracleUpdated(oldOracle, _priceOracle);
+    }
+    
+    /**
+     * @dev 基于真实价格计算并设置交换比率
+     * @param _tokenIn 输入代币地址
+     * @param _tokenOut 输出代币地址
+     */
+    function calculateAndSetExchangeRate(address _tokenIn, address _tokenOut) external onlyOwner {
+        require(_tokenIn != address(0), "Invalid token in address");
+        require(_tokenOut != address(0), "Invalid token out address");
+        require(_tokenIn != _tokenOut, "Tokens must be different");
+        
+        try priceOracle.getLatestPrice(_tokenIn) returns (int256 priceIn, uint256) {
+            try priceOracle.getLatestPrice(_tokenOut) returns (int256 priceOut, uint256) {
+                require(priceIn > 0 && priceOut > 0, "Invalid prices");
+                
+                // 计算交换比率：1 tokenIn = ? tokenOut
+                // rate = (priceIn / priceOut) * 10000
+                uint256 rate = uint256(priceIn * 10000) / uint256(priceOut);
+                
+                exchangeRates[_tokenIn][_tokenOut] = rate;
+                emit ExchangeRateSet(_tokenIn, _tokenOut, rate);
+                
+            } catch {
+                revert("Failed to get token out price");
+            }
+        } catch {
+            revert("Failed to get token in price");
+        }
+    }
+    
+    /**
+     * @dev 批量计算并设置交换比率
+     * @param _tokensIn 输入代币地址数组
+     * @param _tokensOut 输出代币地址数组
+     */
+    function batchCalculateAndSetExchangeRates(
+        address[] calldata _tokensIn,
+        address[] calldata _tokensOut
+    ) external onlyOwner {
+        require(_tokensIn.length == _tokensOut.length, "Arrays length mismatch");
+        
+        for (uint256 i = 0; i < _tokensIn.length; i++) {
+            this.calculateAndSetExchangeRate(_tokensIn[i], _tokensOut[i]);
+        }
+    }
+    
+    /**
+     * @dev 手动设置交换比率
      * @param _tokenIn 输入代币地址
      * @param _tokenOut 输出代币地址
      * @param _rate 交换比率（基点，10000 = 100%）
@@ -51,6 +114,27 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
         require(_rate > 0, "Rate must be positive");
         exchangeRates[_tokenIn][_tokenOut] = _rate;
         emit ExchangeRateSet(_tokenIn, _tokenOut, _rate);
+    }
+    
+    /**
+     * @dev 批量设置交换比率
+     * @param _tokensIn 输入代币地址数组
+     * @param _tokensOut 输出代币地址数组
+     * @param _rates 交换比率数组
+     */
+    function batchSetExchangeRates(
+        address[] calldata _tokensIn,
+        address[] calldata _tokensOut,
+        uint256[] calldata _rates
+    ) external onlyOwner {
+        require(_tokensIn.length == _tokensOut.length, "Arrays length mismatch");
+        require(_tokensIn.length == _rates.length, "Rates array length mismatch");
+        
+        for (uint256 i = 0; i < _tokensIn.length; i++) {
+            require(_rates[i] > 0, "Rate must be positive");
+            exchangeRates[_tokensIn[i]][_tokensOut[i]] = _rates[i];
+            emit ExchangeRateSet(_tokensIn[i], _tokensOut[i], _rates[i]);
+        }
     }
     
     /**
@@ -74,14 +158,13 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
      * @param _tokenIn 输入代币地址
      * @param _tokenOut 输出代币地址
      * @param _amountIn 输入代币数量
-     * @param _fee 池费率（忽略，仅为兼容性）
      * @return amountOut 预期输出数量
      */
     function getQuote(
         address _tokenIn,
         address _tokenOut,
         uint256 _amountIn,
-        uint24 _fee
+        uint24 /* _fee */
     ) external view returns (uint256 amountOut) {
         uint256 rate = getExchangeRate(_tokenIn, _tokenOut);
         amountOut = (_amountIn * rate) / BASIS_POINTS;
@@ -93,7 +176,6 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
      * @param _tokenOut 输出代币地址
      * @param _amountIn 输入代币数量
      * @param _recipient 接收者地址
-     * @param _fee 池费率（忽略，仅为兼容性）
      * @return amountOut 实际输出数量
      */
     function swapExactInputSingle(
@@ -101,7 +183,7 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
         address _tokenOut,
         uint256 _amountIn,
         address _recipient,
-        uint24 _fee
+        uint24 /* _fee */
     ) external nonReentrant returns (uint256 amountOut) {
         require(_amountIn > 0, "Invalid input amount");
         require(_recipient != address(0), "Invalid recipient");
@@ -114,8 +196,6 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
         IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
         
         // 模拟铸造输出代币给接收者
-        // 注意：在真实环境中，这里应该是从池中获取代币
-        // 为了测试目的，我们假设合约有足够的输出代币
         _mintOrTransferToken(_tokenOut, _recipient, amountOut);
         
         emit TokenSwapped(_tokenIn, _tokenOut, _amountIn, amountOut, _recipient);
@@ -170,7 +250,6 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
     
     /**
      * @dev 模拟铸造或转移代币
-     * 在测试环境中，我们优先使用已有的代币余额
      * @param _token 代币地址
      * @param _recipient 接收者地址
      * @param _amount 数量
@@ -192,7 +271,6 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
             // 铸造成功
         } catch {
             // 如果铸造也失败，这是一个测试环境的限制
-            // 在真实环境中，这里应该从 Uniswap 池获取代币
             revert("Insufficient token balance for mock swap");
         }
     }
@@ -227,6 +305,19 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
+     * @dev 批量预存代币
+     * @param _tokens 代币地址数组
+     * @param _amounts 数量数组
+     */
+    function batchDepositTokens(address[] calldata _tokens, uint256[] calldata _amounts) external {
+        require(_tokens.length == _amounts.length, "Arrays length mismatch");
+        
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            IERC20(_tokens[i]).safeTransferFrom(msg.sender, address(this), _amounts[i]);
+        }
+    }
+    
+    /**
      * @dev 紧急提取代币（仅限所有者）
      * @param _token 代币地址
      * @param _amount 提取数量
@@ -242,5 +333,17 @@ contract MockUniswapIntegration is Ownable, ReentrancyGuard {
      */
     function getTokenBalance(address _token) external view returns (uint256 balance) {
         return IERC20(_token).balanceOf(address(this));
+    }
+    
+    /**
+     * @dev 获取多个代币的余额
+     * @param _tokens 代币地址数组
+     * @return balances 余额数组
+     */
+    function getMultipleTokenBalances(address[] calldata _tokens) external view returns (uint256[] memory balances) {
+        balances = new uint256[](_tokens.length);
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            balances[i] = IERC20(_tokens[i]).balanceOf(address(this));
+        }
     }
 }

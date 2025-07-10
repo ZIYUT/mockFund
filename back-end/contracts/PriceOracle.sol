@@ -6,12 +6,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PriceOracle
- * @dev 使用 Chainlink 价格预言机获取代币实时价格
+ * @dev 使用 Sepolia Chainlink 真实价格预言机获取实时价格
  */
 contract PriceOracle is Ownable {
     
-    // 代币地址到价格预言机的映射
+    // 代币地址到 Chainlink 价格预言机的映射
     mapping(address => AggregatorV3Interface) public priceFeeds;
+    
+    // Sepolia 测试网上的 Chainlink 价格预言机地址
+    mapping(string => address) public sepoliaPriceFeeds;
     
     // 价格有效期（秒）
     uint256 public constant PRICE_VALIDITY_PERIOD = 3600; // 1小时
@@ -20,10 +23,26 @@ contract PriceOracle is Ownable {
     event PriceFeedUpdated(address indexed token, address indexed priceFeed);
     event PriceRetrieved(address indexed token, int256 price, uint256 timestamp);
     
-    constructor(address _initialOwner) Ownable(_initialOwner) {}
+    constructor(address _initialOwner) Ownable(_initialOwner) {
+        // 初始化 Sepolia 测试网的价格预言机地址
+        _initializeSepoliaPriceFeeds();
+    }
     
     /**
-     * @dev 设置代币的价格预言机
+     * @dev 初始化 Sepolia 测试网的价格预言机地址
+     */
+    function _initializeSepoliaPriceFeeds() internal {
+        // Sepolia 测试网上的 Chainlink 价格预言机地址
+        sepoliaPriceFeeds["ETH"] = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // ETH/USD
+        sepoliaPriceFeeds["BTC"] = 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43; // BTC/USD
+        sepoliaPriceFeeds["LINK"] = 0xc59E3633BAAC79493d908e63626716e204A45EdF; // LINK/USD
+        sepoliaPriceFeeds["USDC"] = 0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E; // USDC/USD
+        sepoliaPriceFeeds["DAI"] = 0x14866185B1962B63C3Ea9E03Bc1da838bab34C19;  // DAI/USD
+
+    }
+    
+    /**
+     * @dev 设置代币的 Chainlink 价格预言机
      * @param _token 代币地址
      * @param _priceFeed Chainlink 价格预言机地址
      */
@@ -33,6 +52,21 @@ contract PriceOracle is Ownable {
         
         priceFeeds[_token] = AggregatorV3Interface(_priceFeed);
         emit PriceFeedUpdated(_token, _priceFeed);
+    }
+    
+    /**
+     * @dev 使用预定义的 Sepolia 价格预言机设置代币
+     * @param _token 代币地址
+     * @param _symbol 代币符号 (ETH, BTC, LINK, USDC, DAI)
+     */
+    function setPriceFeedBySymbol(address _token, string memory _symbol) external onlyOwner {
+        require(_token != address(0), "Invalid token address");
+        
+        address priceFeedAddress = sepoliaPriceFeeds[_symbol];
+        require(priceFeedAddress != address(0), "Price feed not found for symbol");
+        
+        priceFeeds[_token] = AggregatorV3Interface(priceFeedAddress);
+        emit PriceFeedUpdated(_token, priceFeedAddress);
     }
     
     /**
@@ -56,6 +90,7 @@ contract PriceOracle is Ownable {
         require(answer > 0, "Invalid price data");
         require(updatedAt > 0, "Price data not available");
         require(block.timestamp - updatedAt <= PRICE_VALIDITY_PERIOD, "Price data too old");
+        require(answeredInRound >= roundId, "Stale price");
         
         return (answer, updatedAt);
     }
@@ -84,16 +119,15 @@ contract PriceOracle is Ownable {
      * @dev 计算代币价值（以 USDC 计价）
      * @param _token 代币地址
      * @param _amount 代币数量
-     * @return value 价值（6位小数，USDC 格式）
+     * @return usdcValue USDC价值
      */
-    function calculateTokenValue(address _token, uint256 _amount) external view returns (uint256 value) {
+    function calculateTokenValue(address _token, uint256 _amount) external view returns (uint256 usdcValue) {
         (int256 price, ) = this.getLatestPrice(_token);
         require(price > 0, "Invalid price");
         
         // Chainlink 价格通常是 8 位小数，转换为 6 位小数（USDC 格式）
-        // value = (amount * price) / 10^(tokenDecimals + 8 - 6)
-        // 假设大多数代币都是 18 位小数
-        value = (_amount * uint256(price)) / (10**(18 + 8 - 6));
+        // 公式：(amount * price) / (10^8) = USDC价值
+        return (_amount * uint256(price)) / (10 ** 8);
     }
     
     /**
@@ -114,5 +148,39 @@ contract PriceOracle is Ownable {
         AggregatorV3Interface priceFeed = priceFeeds[_token];
         require(address(priceFeed) != address(0), "Price feed not set for token");
         return priceFeed.decimals();
+    }
+    
+    /**
+     * @dev 获取 Sepolia 价格预言机地址
+     * @param _symbol 代币符号
+     * @return 价格预言机地址
+     */
+    function getSepoliaPriceFeedAddress(string memory _symbol) external view returns (address) {
+        return sepoliaPriceFeeds[_symbol];
+    }
+    
+    /**
+     * @dev 获取价格预言机的详细信息
+     * @param _token 代币地址
+     * @return priceFeedAddress 价格预言机地址
+     * @return decimals 小数位数
+     * @return description 描述
+     * @return version 版本
+     */
+    function getPriceFeedInfo(address _token) external view returns (
+        address priceFeedAddress,
+        uint8 decimals,
+        string memory description,
+        uint256 version
+    ) {
+        AggregatorV3Interface priceFeed = priceFeeds[_token];
+        require(address(priceFeed) != address(0), "Price feed not set for token");
+        
+        return (
+            address(priceFeed),
+            priceFeed.decimals(),
+            priceFeed.description(),
+            priceFeed.version()
+        );
     }
 }

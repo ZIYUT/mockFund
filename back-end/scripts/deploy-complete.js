@@ -1,178 +1,194 @@
 const { ethers } = require("hardhat");
 
-/**
- * 完整的Mock Fund部署脚本
- * 部署所有核心合约并配置基金
- */
 async function main() {
-  console.log("开始部署Mock Fund合约...");
-  
   const [deployer] = await ethers.getSigners();
   console.log("部署账户:", deployer.address);
-  console.log("账户余额:", ethers.formatEther(await deployer.provider.getBalance(deployer.address)));
-
-  // 1. 部署Mock代币
-  console.log("\n=== 部署Mock代币 ===");
+    console.log("账户余额:", (await deployer.getBalance()).toString());
   
-  // 部署MockUSDC
+    // 1. 部署 MockUSDC
+    console.log("\n1. 部署 MockUSDC...");
   const MockUSDC = await ethers.getContractFactory("MockUSDC");
-  const mockUSDC = await MockUSDC.deploy(deployer.address);
-  await mockUSDC.waitForDeployment();
-  console.log("MockUSDC 部署到:", await mockUSDC.getAddress());
+    const mockUSDC = await MockUSDC.deploy();
+    await mockUSDC.deployed();
+    console.log("MockUSDC 已部署到:", mockUSDC.address);
 
-  // 部署TokenFactory
-  const TokenFactory = await ethers.getContractFactory("TokenFactory");
-  const tokenFactory = await TokenFactory.deploy(deployer.address);
-  await tokenFactory.waitForDeployment();
-  console.log("TokenFactory 部署到:", await tokenFactory.getAddress());
+    // 2. 部署 MockTokensFactory
+    console.log("\n2. 部署 MockTokensFactory...");
+    const MockTokensFactory = await ethers.getContractFactory("MockTokensFactory");
+    const mockTokensFactory = await MockTokensFactory.deploy(deployer.address);
+    await mockTokensFactory.deployed();
+    console.log("MockTokensFactory 已部署到:", mockTokensFactory.address);
 
-  // 部署各个Mock代币
-  const MockWETH = await ethers.getContractFactory("MockWETH");
-  const mockWETH = await MockWETH.deploy(deployer.address);
-  await mockWETH.waitForDeployment();
-  console.log("MockWETH 部署到:", await mockWETH.getAddress());
+    // 部署所有代币
+    console.log("部署所有代币...");
+    await mockTokensFactory.deployAllTokens();
+    console.log("所有代币已部署");
 
-  const MockWBTC = await ethers.getContractFactory("MockWBTC");
-  const mockWBTC = await MockWBTC.deploy(deployer.address);
-  await mockWBTC.waitForDeployment();
-  console.log("MockWBTC 部署到:", await mockWBTC.getAddress());
+    // 获取各个代币地址
+    const [wbtcAddress, wethAddress, linkAddress, daiAddress] = await mockTokensFactory.getAllTokenAddresses();
 
-  const MockLINK = await ethers.getContractFactory("MockLINK");
-  const mockLINK = await MockLINK.deploy(deployer.address);
-  await mockLINK.waitForDeployment();
-  console.log("MockLINK 部署到:", await mockLINK.getAddress());
+    console.log("WBTC 地址:", wbtcAddress);
+    console.log("WETH 地址:", wethAddress);
+    console.log("LINK 地址:", linkAddress);
+    console.log("DAI 地址:", daiAddress);
 
-  const MockUNI = await ethers.getContractFactory("MockUNI");
-  const mockUNI = await MockUNI.deploy(deployer.address);
-  await mockUNI.waitForDeployment();
-  console.log("MockUNI 部署到:", await mockUNI.getAddress());
-
-  const MockDAI = await ethers.getContractFactory("MockDAI");
-  const mockDAI = await MockDAI.deploy(deployer.address);
-  await mockDAI.waitForDeployment();
-  console.log("MockDAI 部署到:", await mockDAI.getAddress());
-
-  // 获取代币地址
-  const mockWETHAddress = await mockWETH.getAddress();
-  const mockWBTCAddress = await mockWBTC.getAddress();
-  const mockLINKAddress = await mockLINK.getAddress();
-  const mockUNIAddress = await mockUNI.getAddress();
-  const mockDAIAddress = await mockDAI.getAddress();
-
-  console.log("Mock WETH:", mockWETHAddress);
-  console.log("Mock WBTC:", mockWBTCAddress);
-  console.log("Mock LINK:", mockLINKAddress);
-  console.log("Mock UNI:", mockUNIAddress);
-  console.log("Mock DAI:", mockDAIAddress);
-
-  // 2. 部署价格预言机
-  console.log("\n=== 部署价格预言机 ===");
-  
+    // 3. 部署 PriceOracle (使用 Chainlink 真实预言机)
+    console.log("\n3. 部署 PriceOracle (Chainlink)...");
   const PriceOracle = await ethers.getContractFactory("PriceOracle");
   const priceOracle = await PriceOracle.deploy(deployer.address);
-  await priceOracle.waitForDeployment();
-  console.log("PriceOracle 部署到:", await priceOracle.getAddress());
+    await priceOracle.deployed();
+    console.log("PriceOracle 已部署到:", priceOracle.address);
 
-  // 3. 部署Uniswap集成合约
-  console.log("\n=== 部署Uniswap集成 ===");
-  
+    // 4. 部署 MockUniswapIntegration
+    console.log("\n4. 部署 MockUniswapIntegration...");
   const MockUniswapIntegration = await ethers.getContractFactory("MockUniswapIntegration");
-  const uniswapIntegration = await MockUniswapIntegration.deploy(deployer.address);
-  await uniswapIntegration.waitForDeployment();
-  console.log("MockUniswapIntegration 部署到:", await uniswapIntegration.getAddress());
+    const mockUniswapIntegration = await MockUniswapIntegration.deploy(deployer.address, priceOracle.address);
+    await mockUniswapIntegration.deployed();
+    console.log("MockUniswapIntegration 已部署到:", mockUniswapIntegration.address);
 
-  // 4. 部署Mock Fund
-  console.log("\n=== 部署Mock Fund ===");
-  
+    // 5. 部署 MockFund
+    console.log("\n5. 部署 MockFund...");
   const MockFund = await ethers.getContractFactory("MockFund");
   const mockFund = await MockFund.deploy(
     "Mock Fund Share Token",
-    "MFS",
+        "MFC",
     deployer.address,
     200, // 2% 管理费
-    await priceOracle.getAddress(),
-    await uniswapIntegration.getAddress()
+        priceOracle.address,
+        mockUniswapIntegration.address
   );
-  await mockFund.waitForDeployment();
-  console.log("MockFund 部署到:", await mockFund.getAddress());
+    await mockFund.deployed();
+    console.log("MockFund 已部署到:", mockFund.address);
 
-  // 获取FundShareToken地址
-  const shareTokenAddress = await mockFund.shareToken();
-  console.log("FundShareToken 部署到:", shareTokenAddress);
+    // 6. 配置 PriceOracle 的价格预言机
+    console.log("\n6. 配置 PriceOracle 的价格预言机...");
+    
+    // 使用 Sepolia 测试网的 Chainlink 价格预言机地址
+    const sepoliaPriceFeeds = {
+        "ETH": "0x694AA1769357215DE4FAC081bf1f309aDC325306", // ETH/USD
+        "BTC": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43", // BTC/USD
+        "LINK": "0xc59E3633BAAC79493d908e63626716e204A45EdF", // LINK/USD
+        "USDC": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E", // USDC/USD
+        "DAI": "0x14866185B1962B63C3Ea9E03Bc1da838bab34C19"   // DAI/USD
+    };
 
-  // 5. 配置合约
-  console.log("\n=== 配置合约 ===");
+    // 设置各个代币的价格预言机
+    await priceOracle.setPriceFeedBySymbol(wethAddress, "ETH");
+    console.log("已设置 WETH 价格预言机");
+    
+    await priceOracle.setPriceFeedBySymbol(wbtcAddress, "BTC");
+    console.log("已设置 WBTC 价格预言机");
+    
+    await priceOracle.setPriceFeedBySymbol(linkAddress, "LINK");
+    console.log("已设置 LINK 价格预言机");
+    
+    await priceOracle.setPriceFeedBySymbol(daiAddress, "DAI");
+    console.log("已设置 DAI 价格预言机");
+    
+    await priceOracle.setPriceFeedBySymbol(mockUSDC.address, "USDC");
+    console.log("已设置 USDC 价格预言机");
+
+    // 7. 配置 MockUniswapIntegration 的交换比率
+    console.log("\n7. 配置 MockUniswapIntegration 的交换比率...");
   
-  // 设置USDC代币地址
-  await mockFund.setUSDCToken(await mockUSDC.getAddress());
-  console.log("✓ 设置USDC代币地址");
+    // 只配置ETH、BTC、LINK、DAI
+    await mockUniswapIntegration.calculateAndSetExchangeRate(mockUSDC.address, wethAddress);
+    await mockUniswapIntegration.calculateAndSetExchangeRate(mockUSDC.address, wbtcAddress);
+    await mockUniswapIntegration.calculateAndSetExchangeRate(mockUSDC.address, linkAddress);
+    await mockUniswapIntegration.calculateAndSetExchangeRate(mockUSDC.address, daiAddress);
+    // 反向
+    await mockUniswapIntegration.calculateAndSetExchangeRate(wethAddress, mockUSDC.address);
+    await mockUniswapIntegration.calculateAndSetExchangeRate(wbtcAddress, mockUSDC.address);
+    await mockUniswapIntegration.calculateAndSetExchangeRate(linkAddress, mockUSDC.address);
+    await mockUniswapIntegration.calculateAndSetExchangeRate(daiAddress, mockUSDC.address);
+    
+    console.log("已计算并设置所有交换比率");
 
-  // 添加支持的代币和目标分配
-  const tokens = [
-    { address: mockWETHAddress, allocation: 2000, name: "WETH" }, // 20%
-    { address: mockWBTCAddress, allocation: 2000, name: "WBTC" }, // 20%
-    { address: mockLINKAddress, allocation: 1000, name: "LINK" }, // 10%
-  ];
+    // 8. 配置 MockFund
+    console.log("\n8. 配置 MockFund...");
+    
+    // 设置 USDC 代币地址
+    await mockFund.setUSDCToken(mockUSDC.address);
+    console.log("已设置 USDC 代币地址");
 
-  for (const token of tokens) {
-    await mockFund.addSupportedToken(token.address, token.allocation);
-    console.log(`✓ 添加支持的代币: ${token.name} (${token.allocation / 100}%)`);
-  }
+    // 添加支持的代币（ETH、BTC、LINK、DAI 各占 12.5%，USDC 50%）
+    await mockFund.addSupportedToken(wbtcAddress, 1250); // 12.5%
+    await mockFund.addSupportedToken(wethAddress, 1250); // 12.5%
+    await mockFund.addSupportedToken(linkAddress, 1250); // 12.5%
+    await mockFund.addSupportedToken(daiAddress, 1250);  // 12.5%
+    // 不再添加UNI
+    
+    console.log("已添加所有支持的代币");
 
-  // 6. 为测试准备代币
-  console.log("\n=== 准备测试代币 ===");
+    // 9. 为测试准备代币
+    console.log("\n9. 为测试准备代币...");
   
-  // 为部署者铸造测试代币
-  const testAmount = ethers.parseUnits("10000", 6); // 10,000 USDC
+    // 铸造测试代币给部署者
+    const testAmount = ethers.utils.parseUnits("1000000", 6); // 100万 USDC
   await mockUSDC.mint(deployer.address, testAmount);
-  console.log("✓ 为部署者铸造 10,000 USDC");
+    console.log("已铸造 100万 USDC 给部署者");
 
-  // 为MockUniswapIntegration铸造代币用于交换
-  const largeAmount = ethers.parseUnits("1000000", 18); // 1M tokens
+    // 为 MockUniswapIntegration 预存一些代币用于交换
+    const swapAmount = ethers.utils.parseUnits("100000", 6); // 10万 USDC
+    await mockUSDC.approve(mockUniswapIntegration.address, swapAmount);
+    await mockUniswapIntegration.depositToken(mockUSDC.address, swapAmount);
+    console.log("已为 MockUniswapIntegration 预存 10万 USDC");
   
-  // 为WETH铸造代币
-  await mockWETH.mint(await uniswapIntegration.getAddress(), largeAmount);
-  console.log(`✓ 为MockUniswapIntegration铸造 WETH`);
+    // 10. 初始化基金
+    console.log("\n10. 初始化基金...");
+    
+    // 批准 USDC 给基金
+    const initialAmount = ethers.utils.parseUnits("1000000", 6); // 100万 USDC
+    await mockUSDC.approve(mockFund.address, initialAmount);
   
-  // 为WBTC铸造代币 (8位小数)
-  const wbtcAmount = ethers.parseUnits("10000", 8); // 10K WBTC
-  await mockWBTC.mint(await uniswapIntegration.getAddress(), wbtcAmount);
-  console.log(`✓ 为MockUniswapIntegration铸造 WBTC`);
-  
-  // 为LINK铸造代币
-  await mockLINK.mint(await uniswapIntegration.getAddress(), largeAmount);
-  console.log(`✓ 为MockUniswapIntegration铸造 LINK`);
+    // 初始化基金
+    await mockFund.initializeFund(initialAmount);
+    console.log("基金已初始化");
 
-  // 7. 输出部署信息
+    // 11. 输出部署信息
   console.log("\n=== 部署完成 ===");
-  console.log("合约地址:");
-  console.log("{");
-  console.log(`  MOCK_FUND: "${await mockFund.getAddress()}",`);
-  console.log(`  FUND_SHARE_TOKEN: "${shareTokenAddress}",`);
-  console.log(`  PRICE_ORACLE: "${await priceOracle.getAddress()}",`);
-  console.log(`  UNISWAP_INTEGRATION: "${await uniswapIntegration.getAddress()}",`);
-  console.log(`  MOCK_USDC: "${await mockUSDC.getAddress()}",`);
-  console.log(`  MOCK_WETH: "${mockWETHAddress}",`);
-  console.log(`  MOCK_WBTC: "${mockWBTCAddress}",`);
-  console.log(`  MOCK_LINK: "${mockLINKAddress}",`);
-  console.log(`  MOCK_UNI: "${mockUNIAddress}",`);
-  console.log(`  MOCK_DAI: "${mockDAIAddress}",`);
-  console.log(`  TOKEN_FACTORY: "${await tokenFactory.getAddress()}"`);;
-  console.log("}");
-
-  // 8. 验证部署
-  console.log("\n=== 验证部署 ===");
-  
-  const fundStats = await mockFund.getFundStats();
-  console.log("基金统计:");
-  console.log(`  总资产: ${ethers.formatUnits(fundStats[0], 6)} USDC`);
-  console.log(`  总份额: ${ethers.formatUnits(fundStats[1], 18)} MFS`);
-  console.log(`  当前NAV: ${ethers.formatUnits(fundStats[2], 6)} USDC`);
-
-  const supportedTokens = await mockFund.getSupportedTokens();
-  console.log(`  支持的代币数量: ${supportedTokens.length}`);
-
-  console.log("\n✅ Mock Fund 部署和配置完成!");
+    console.log("MockUSDC:", mockUSDC.address);
+    console.log("MockTokensFactory:", mockTokensFactory.address);
+    console.log("PriceOracle:", priceOracle.address);
+    console.log("MockUniswapIntegration:", mockUniswapIntegration.address);
+    console.log("MockFund:", mockFund.address);
+    console.log("FundShareToken:", await mockFund.shareToken());
+    
+    console.log("\n=== 代币地址 ===");
+    console.log("WBTC:", wbtcAddress);
+    console.log("WETH:", wethAddress);
+    console.log("LINK:", linkAddress);
+    console.log("DAI:", daiAddress);
+    
+    console.log("\n=== 测试信息 ===");
+    console.log("部署者地址:", deployer.address);
+    console.log("部署者 USDC 余额:", ethers.utils.formatUnits(await mockUSDC.balanceOf(deployer.address), 6));
+    console.log("部署者 MFC 余额:", ethers.utils.formatUnits(await mockFund.shareToken().balanceOf(deployer.address), 18));
+    
+    // 保存部署地址到文件
+    const fs = require('fs');
+    const deploymentInfo = {
+        network: "sepolia",
+        deployer: deployer.address,
+        contracts: {
+            MockUSDC: mockUSDC.address,
+            MockTokensFactory: mockTokensFactory.address,
+            PriceOracle: priceOracle.address,
+            MockUniswapIntegration: mockUniswapIntegration.address,
+            MockFund: mockFund.address,
+            FundShareToken: await mockFund.shareToken()
+        },
+        tokens: {
+            WBTC: wbtcAddress,
+            WETH: wethAddress,
+            LINK: linkAddress,
+            DAI: daiAddress
+        },
+        deploymentTime: new Date().toISOString()
+    };
+    
+    fs.writeFileSync('deployment-info.json', JSON.stringify(deploymentInfo, null, 2));
+    console.log("\n部署信息已保存到 deployment-info.json");
 }
 
 main()

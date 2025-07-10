@@ -1,40 +1,40 @@
 {
   "name": "mock-fund-backend",
   "version": "1.0.0",
-  "description": "Mock Fund DeFi Smart Contracts",
+  "description": "Mock Fund Smart Contracts for Sepolia Testnet",
   "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "deploy:localhost": "hardhat run scripts/deploy.js --network localhost",
-    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:sepolia": "hardhat run scripts/deploy-complete.js --network sepolia",
+    "deploy:sepolia-chainlink": "hardhat run scripts/deploy-sepolia-chainlink.js --network sepolia",
+    "deploy:local": "hardhat run scripts/deploy-complete.js --network localhost",
+    "verify:sepolia": "hardhat run scripts/verify.js --network sepolia",
+    "mint-tokens": "hardhat run scripts/mint-test-tokens.js --network sepolia",
+    "debug-investment": "hardhat run scripts/debug-investment.js --network sepolia",
     "node": "hardhat node",
     "clean": "hardhat clean",
     "coverage": "hardhat coverage"
   },
   "keywords": [
-    "defi",
     "ethereum",
-    "hardhat",
     "solidity",
-    "smart-contracts"
+    "defi",
+    "fund",
+    "sepolia",
+    "testnet"
   ],
   "author": "Mock Fund Team",
   "license": "MIT",
   "devDependencies": {
+    "@chainlink/contracts": "^0.8.0",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.0",
-    "@openzeppelin/hardhat-upgrades": "^3.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
     "hardhat": "^2.19.0",
-    "hardhat-gas-reporter": "^1.0.9",
-    "solidity-coverage": "^0.8.5"
+    "hardhat-deploy": "^0.12.0",
+    "hardhat-deploy-ethers": "^0.4.0"
   },
   "dependencies": {
-    "@chainlink/contracts": "^0.8.0",
-    "@openzeppelin/contracts": "^5.0.0",
-    "@uniswap/v3-periphery": "^1.4.4",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^5.1.0"
+    "dotenv": "^16.3.1"
   }
 }

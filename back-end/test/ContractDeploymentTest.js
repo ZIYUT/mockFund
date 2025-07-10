@@ -37,7 +37,7 @@ describe("智能合约部署和基础功能测试", function () {
 
     // 部署Uniswap集成
     const MockUniswapIntegration = await ethers.getContractFactory("MockUniswapIntegration");
-    uniswapIntegration = await MockUniswapIntegration.deploy(owner.address);
+    uniswapIntegration = await MockUniswapIntegration.deploy(owner.address, await priceOracle.getAddress());
     await uniswapIntegration.waitForDeployment();
 
     // 部署Mock Fund
@@ -136,9 +136,11 @@ describe("智能合约部署和基础功能测试", function () {
       expect(supportedTokens.length).to.equal(0);
     });
 
-    it("初始NAV应该为1 USDC", async function () {
-      const initialNAV = await mockFund.getCurrentNAV();
-      expect(initialNAV).to.equal(ethers.parseUnits("1", 6));
+    it("初始基金状态应该正确", async function () {
+      const fundStats = await mockFund.getFundStats();
+      expect(fundStats[0]).to.equal(0); // totalSupply = 0
+      expect(fundStats[1]).to.equal(ethers.parseUnits("1000000", 18)); // INITIAL_MFC_SUPPLY
+      expect(fundStats[2]).to.equal(false); // isInitialized = false
     });
   });
 

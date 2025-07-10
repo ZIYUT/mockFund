@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./MockUSDC.sol";
 
 contract MockWETH is ERC20, Ownable {
     
@@ -116,43 +115,6 @@ contract MockLINK is ERC20, Ownable {
     }
 }
 
-contract MockUNI is ERC20, Ownable {
-    
-    event TokensMinted(address indexed to, uint256 amount);
-    
-    constructor(address _initialOwner) 
-        ERC20("Mock Uniswap Token", "UNI") 
-        Ownable(_initialOwner) 
-    {
-        require(_initialOwner != address(0), "Invalid owner address");
-        _mint(_initialOwner, 10000 * 10**decimals()); // 10,000 UNI
-    }
-    
-    function decimals() public pure override returns (uint8) {
-        return 18;
-    }
-    
-    function mint(address to, uint256 amount) external onlyOwner {
-        require(to != address(0), "Cannot mint to zero address");
-        require(amount > 0, "Amount must be greater than zero");
-        _mint(to, amount);
-        emit TokensMinted(to, amount);
-    }
-    
-    function faucet(uint256 amount) external {
-        require(amount > 0, "Amount must be greater than zero");
-        require(amount <= 1000 * 10**decimals(), "Amount too large"); // Maximum 1000 UNI
-        _mint(msg.sender, amount);
-        emit TokensMinted(msg.sender, amount);
-    }
-    
-    function getTestTokens() external {
-        uint256 testAmount = 50 * 10**decimals(); // 50 UNI
-        _mint(msg.sender, testAmount);
-        emit TokensMinted(msg.sender, testAmount);
-    }
-}
-
 contract MockDAI is ERC20, Ownable {
     
     event TokensMinted(address indexed to, uint256 amount);
@@ -190,42 +152,67 @@ contract MockDAI is ERC20, Ownable {
     }
 }
 
-
-contract TokenFactory is Ownable {
+/**
+ * @title MockTokensFactory
+ * @dev 工厂合约，用于部署和管理所有模拟代币
+ */
+contract MockTokensFactory is Ownable {
     
-    // Deployed token contract addresses
-    mapping(string => address) public deployedTokens;
-    address[] public allTokens;
+    // 代币地址映射
+    address public wbtc;
+    address public weth;
+    address public link;
+    address public dai;
     
-    // Events
-    event TokenRegistered(string indexed symbol, address indexed tokenAddress);
+    // 事件
+    event TokenDeployed(string symbol, address tokenAddress);
     
     constructor(address _initialOwner) Ownable(_initialOwner) {
         require(_initialOwner != address(0), "Invalid owner address");
     }
     
-
-    function registerToken(string memory symbol, address tokenAddress) external onlyOwner {
-        require(tokenAddress != address(0), "Invalid token address");
-        require(deployedTokens[symbol] == address(0), "Token already registered");
+    /**
+     * @dev 部署所有代币
+     */
+    function deployAllTokens() external onlyOwner {
+        // 部署 WBTC
+        MockWBTC wbtcToken = new MockWBTC(owner());
+        wbtc = address(wbtcToken);
+        emit TokenDeployed("WBTC", wbtc);
         
-        deployedTokens[symbol] = tokenAddress;
-        allTokens.push(tokenAddress);
-        emit TokenRegistered(symbol, tokenAddress);
+        // 部署 WETH
+        MockWETH wethToken = new MockWETH(owner());
+        weth = address(wethToken);
+        emit TokenDeployed("WETH", weth);
+        
+        // 部署 LINK
+        MockLINK linkToken = new MockLINK(owner());
+        link = address(linkToken);
+        emit TokenDeployed("LINK", link);
+        
+        // 部署 DAI
+        MockDAI daiToken = new MockDAI(owner());
+        dai = address(daiToken);
+        emit TokenDeployed("DAI", dai);
     }
     
-
-    function getTokenAddress(string memory symbol) external view returns (address) {
-        return deployedTokens[symbol];
+    /**
+     * @dev 获取所有代币地址
+     */
+    function getAllTokenAddresses() external view returns (
+        address wbtcAddress,
+        address wethAddress,
+        address linkAddress,
+        address daiAddress
+    ) {
+        return (wbtc, weth, link, dai);
     }
     
-
-    function getAllTokens() external view returns (address[] memory) {
-        return allTokens;
-    }
-    
-
-    function isTokenDeployed(string memory symbol) external view returns (bool) {
-        return deployedTokens[symbol] != address(0);
+    /**
+     * @dev 检查所有代币是否已部署
+     */
+    function areAllTokensDeployed() external view returns (bool) {
+        return wbtc != address(0) && weth != address(0) && 
+               link != address(0) && dai != address(0);
     }
 }

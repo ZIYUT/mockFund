@@ -112,29 +112,29 @@ await mockFund.redeem(ethers.utils.parseEther("1000"));
 ## 管理费收取机制
 
 ### 管理费类型
-- **年化管理费**：对流通中的 MFC 份额按年化费率收取，按分钟计提。
-- **赎回管理费**：用户赎回时，按赎回金额收取一定比例的管理费。
+- **管理费**：对流通中的 MFC 份额按1%费率收取，按分钟计提。
+- **赎回管理费**：用户赎回时，按赎回金额收取1%管理费。
 
 ### 管理费参数
-- 年化管理费率（默认 2%，可配置）：
+- 年化管理费率：**固定为1%**（不可更改）
   ```solidity
-  uint256 public managementFeeRate = 200; // 2%（以 basis points 计，10000 = 100%）
+  uint256 public constant managementFeeRate = 100; // 1%（以 basis points 计，10000 = 100%）
   ```
-- 赎回费率（默认 0.5%，可配置）：
+- 赎回费率：**固定为1%**（不可更改）
   ```solidity
-  uint256 public redemptionFeeRate = 50; // 0.5%
+  uint256 public constant redemptionFeeRate = 100; // 1%
   ```
-- 计费周期：每分钟自动计提一次年化管理费。
+- 计费周期：每分钟自动计提一次管理费。
 
 ### 管理费收取逻辑
-1. **年化管理费**
-   - 合约每分钟自动计算流通 MFC 份额的 2% 年化费率，折算为每分钟应收金额。
+1. **管理费**
+   - 合约每分钟自动计算流通 MFC 份额的 1% 费率，折算为每分钟应收金额。
    - 管理费以 USDC 形式从基金资产中扣除，优先使用 USDC，不足时自动卖出其他代币补足。
    - 管理费累计到合约，由所有者提取。
    - 相关事件：`ManagementFeeCollected(uint256 amount, uint256 timestamp, uint256 totalFees)`
 
 2. **赎回管理费**
-   - 用户赎回时，自动从赎回金额中扣除 0.5% 作为管理费。
+   - 用户赎回时，自动从赎回金额中扣除 1% 作为管理费。
    - 剩余 USDC 返还用户。
 
 #### 管理费收取示例
@@ -155,8 +155,8 @@ function _collectManagementFee() internal {
 ---
 
 ## 费用结构
-- **年化管理费**：2%（可配置）
-- **赎回费**：0.5%（可配置）
+- **管理费**：1%（固定）
+- **赎回费**：1%（固定）
 - **最小投资**：10 USDC
 - **最小赎回**：10 USDC
 
@@ -186,10 +186,10 @@ uint256 public constant USDC_ALLOCATION = 5000; // 50%
 uint256 public constant TOKEN_ALLOCATION = 5000; // 50%
 ```
 
-### 调整费用参数
+### 费用参数（已固定，无需更改）
 ```solidity
-managementFeeRate = 200; // 2%
-redemptionFeeRate = 50;   // 0.5%
+uint256 public constant managementFeeRate = 100; // 1%
+uint256 public constant redemptionFeeRate = 100; // 1%
 ```
 
 ### 本地测试与部署

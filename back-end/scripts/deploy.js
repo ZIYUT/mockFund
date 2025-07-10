@@ -99,7 +99,7 @@ async function main() {
             "Mock Fund Shares",  // Share token name
             "MFS",              // Share token symbol
             deployer.address,    // Initial owner
-            200,                 // Management fee rate 2%
+            100,                 // Management fee rate 1%
             priceOracleAddress,  // Price oracle address
             mockUniswapIntegrationAddress // MockUniswap integration address
         );

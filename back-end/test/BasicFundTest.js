@@ -42,7 +42,7 @@ describe("MockFund 基础功能测试", function () {
       "Mock Fund Share Token",
       "MFS",
       owner.address,
-      200, // 2% 管理费
+      100, // 1% 管理费
       await priceOracle.getAddress(),
       await uniswapIntegration.getAddress()
     );
@@ -111,7 +111,7 @@ describe("MockFund 基础功能测试", function () {
       expect(await shareToken.name()).to.equal("Mock Fund Share Token");
       expect(await shareToken.symbol()).to.equal("MFS");
       expect(await mockFund.owner()).to.equal(owner.address);
-      expect(await mockFund.managementFeeRate()).to.equal(200);
+      expect(await mockFund.managementFeeRate()).to.equal(100);
     });
 
     it("应该正确设置USDC代币地址", async function () {

@@ -56,8 +56,6 @@ contract MockFund is Ownable, ReentrancyGuard, Pausable {
     
     // 常量
     uint256 public constant BASIS_POINTS = 10000;
-    uint256 public constant MAX_MANAGEMENT_FEE = 500; // 最大管理费 5%
-    uint256 public constant MAX_REDEMPTION_FEE = 100; // 最大赎回费 1%
     
     // 事件
     event FundInitialized(uint256 initialMFCSupply, uint256 initialUSDCAmount);
@@ -75,7 +73,7 @@ contract MockFund is Ownable, ReentrancyGuard, Pausable {
         address _uniswapIntegration
     ) Ownable(_initialOwner) {
         require(_initialOwner != address(0), "Invalid owner address");
-        require(_managementFeeRate <= MAX_MANAGEMENT_FEE, "Management fee too high");
+        require(_managementFeeRate == 100, "Management fee must be 1%"); // 固定1%
         require(_priceOracle != address(0), "Invalid price oracle address");
         require(_uniswapIntegration != address(0), "Invalid Uniswap integration address");
         
@@ -88,10 +86,10 @@ contract MockFund is Ownable, ReentrancyGuard, Pausable {
         uniswapIntegration = MockUniswapIntegration(_uniswapIntegration);
         
         // 设置初始参数
-        managementFeeRate = _managementFeeRate;
+        managementFeeRate = 100; // 固定1%
         minimumInvestment = 10 * 10**6; // 10 USDC
         minimumRedemption = 10 * 10**6; // 10 USDC
-        redemptionFeeRate = 50; // 0.5%
+        redemptionFeeRate = 100; // 固定1%
         lastFeeCollection = block.timestamp;
     }
     

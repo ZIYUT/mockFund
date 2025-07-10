@@ -6,7 +6,10 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync-addresses": "node scripts/sync-addresses.js",
+    "deploy:sepolia": "cd ../back-end && npx hardhat run scripts/deploy-sepolia.js --network sepolia",
+    "deploy:local": "cd ../back-end && npx hardhat run scripts/deploy.js --network localhost"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.81.5",

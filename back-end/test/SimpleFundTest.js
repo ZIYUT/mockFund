@@ -67,13 +67,13 @@ describe("MockFund 智能合约测试", function () {
     await mockFund.addSupportedToken(await mockWETH.getAddress(), 1250); // 12.5%
     await mockFund.addSupportedToken(await mockWBTC.getAddress(), 1250); // 12.5%
     await mockFund.addSupportedToken(await mockLINK.getAddress(), 1250); // 12.5%
-    
+
     // 部署DAI代币用于测试
     const MockDAI = await ethers.getContractFactory("MockDAI");
     mockDAI = await MockDAI.deploy(owner.address);
     await mockDAI.waitForDeployment();
     await mockFund.addSupportedToken(await mockDAI.getAddress(), 1250); // 12.5%
-    
+
     // 为MockUniswapIntegration预存代币用于交换
     const largeAmount = ethers.parseUnits("1000000", 18); // 1M tokens
     await mockWETH.mint(await uniswapIntegration.getAddress(), largeAmount);

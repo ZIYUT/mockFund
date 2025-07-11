@@ -1,96 +1,133 @@
 'use client';
 
 import { useState } from 'react';
+import { useAccount } from 'wagmi';
+import WalletConnect from '@/components/WalletConnect';
+import FundInvestment from '@/components/FundInvestment';
+import FundRedemption from '@/components/FundRedemption';
+import DebugInfo from '@/components/DebugInfo';
+import { useMockFund } from '@/hooks/useMockFund';
 
 export default function Home() {
-  const [testState, setTestState] = useState(0);
-
-  const handleClick = () => {
-    setTestState(prev => prev + 1);
-    alert(`按钮点击测试成功！点击次数: ${testState + 1}`);
-  };
+  const { isConnected } = useAccount();
+  const { isInitialized, nav, mfcValue } = useMockFund();
+  const [activeTab, setActiveTab] = useState<'investment' | 'redemption'>('investment');
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">MockFund 投资平台 (调试版)</h1>
-              <p className="text-sm text-gray-600">测试按钮交互功能</p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">点击次数: {testState}</span>
-              <button
-                onClick={handleClick}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                测试按钮
-              </button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* 头部 */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">MockFund DeFi 基金</h1>
+          <p className="text-lg text-gray-600">基于 Chainlink 真实价格的去中心化投资基金</p>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Test Section */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4">按钮功能测试</h2>
-            <div className="space-y-4">
-              <button
-                onClick={() => alert('按钮1点击成功！')}
-                className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-              >
-                测试按钮 1
-              </button>
-              
-              <button
-                onClick={() => alert('按钮2点击成功！')}
-                className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                测试按钮 2
-              </button>
-              
-              <button
-                onClick={() => {
-                  const input = prompt('请输入一些文字:');
-                  if (input) {
-                    alert(`您输入了: ${input}`);
-                  }
-                }}
-                className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-              >
-                交互测试按钮
-              </button>
+        {/* 调试信息 */}
+        <DebugInfo />
+        
+        {/* 基金概览 */}
+        {isInitialized && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 className="text-2xl font-bold mb-4">基金概览</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-blue-800">基金净值</h3>
+                <p className="text-2xl font-bold text-blue-600">${parseFloat(nav).toLocaleString()}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-green-800">MFC价值</h3>
+                <p className="text-2xl font-bold text-green-600">${parseFloat(mfcValue).toFixed(4)}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-purple-800">投资组合</h3>
+                <p className="text-2xl font-bold text-purple-600">50% USDC + 50% 代币</p>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-orange-800">管理费率</h3>
+                <p className="text-2xl font-bold text-orange-600">1%</p>
+              </div>
             </div>
           </div>
-          
-          {/* Navigation */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4">页面导航</h2>
-            <div className="space-y-4">
-               <a
-                 href="/web3"
-                 className="block w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-center"
-               >
-                 Web3 功能页面
-               </a>
-             </div>
-            
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h3 className="font-semibold text-yellow-800 mb-2">故障排除</h3>
-              <p className="text-sm text-yellow-700">
-                如果按钮仍然无法点击，请检查浏览器控制台是否有错误信息，
-                或查看 TROUBLESHOOTING.md 文件获取详细的故障排除指南。
-              </p>
-            </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 左侧：钱包连接 */}
+          <div className="lg:col-span-1">
+            <WalletConnect />
+          </div>
+
+          {/* 右侧：投资/赎回功能 */}
+          <div className="lg:col-span-2">
+            {!isConnected ? (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold mb-4">开始投资</h2>
+                <div className="text-center py-8">
+                  <p className="text-gray-600">请先连接钱包以开始投资</p>
+                </div>
+              </div>
+            ) : !isInitialized ? (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold mb-4">基金状态</h2>
+                <div className="text-center py-8">
+                  <p className="text-gray-600">基金尚未初始化，请稍后再试</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-md">
+                {/* 标签页 */}
+                <div className="border-b border-gray-200">
+                  <nav className="flex">
+                    <button
+                      onClick={() => setActiveTab('investment')}
+                      className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'investment'
+                          ? 'border-green-500 text-green-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      投资
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('redemption')}
+                      className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'redemption'
+                          ? 'border-red-500 text-red-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      赎回
+                    </button>
+                  </nav>
+                </div>
+
+                {/* 标签页内容 */}
+                <div className="p-6">
+                  {activeTab === 'investment' ? (
+                    <FundInvestment />
+                  ) : (
+                    <FundRedemption />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </main>
+
+        {/* 底部信息 */}
+        <div className="mt-12 text-center text-sm text-gray-500">
+          <p>合约地址: MockFund - 0x92053436b6D0758EcFb765C86a71b2dC4228DEa0</p>
+          <p className="mt-2">
+            <a 
+              href="https://sepolia.etherscan.io/address/0x92053436b6D0758EcFb765C86a71b2dC4228DEa0" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              在 Etherscan 上查看合约
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

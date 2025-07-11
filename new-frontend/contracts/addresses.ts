@@ -1,22 +1,22 @@
 // Sepolia 测试网合约地址
 export const CONTRACT_ADDRESSES = {
   // 主要合约
-  MockFund: "0x0000000000000000000000000000000000000000", // 需要部署后更新
-  FundShareToken: "0x0000000000000000000000000000000000000000", // 需要部署后更新
+  MockFund: "0x92053436b6D0758EcFb765C86a71b2dC4228DEa0",
+  FundShareToken: "0xA7b9E425e9D2A5c9E484B45c15bc44F4b9fB2842",
   
   // 代币合约
-  MockUSDC: "0x0000000000000000000000000000000000000000", // 需要部署后更新
-  MockTokens: "0x0000000000000000000000000000000000000000", // 需要部署后更新
+  MockUSDC: "0x3664cB1F94442d995f9Ae62062CB26f5A77F58CB",
+  MockTokensFactory: "0xF789421d1ed0D65c65aa076CB119bfBc028f554D",
   
   // 服务合约
-  PriceOracle: "0x0000000000000000000000000000000000000000", // 需要部署后更新
-  MockUniswapIntegration: "0x0000000000000000000000000000000000000000", // 需要部署后更新
+  ChainlinkPriceOracle: "0x5FCD8EbE1B61e7037002cDc33dBCAA91c7AeD5c0",
+  UniswapIntegration: "0x427f38fCA385A1C57e6b4995474457939CD03aAF",
   
-  // 各个代币地址（从 MockTokens 合约获取）
-  WBTC: "0x0000000000000000000000000000000000000000", // 需要部署后更新
-  WETH: "0x0000000000000000000000000000000000000000", // 需要部署后更新
-  LINK: "0x0000000000000000000000000000000000000000", // 需要部署后更新
-  DAI: "0x0000000000000000000000000000000000000000", // 需要部署后更新
+  // 各个代币地址（从 MockTokensFactory 合约获取）
+  WBTC: "0x29371fc64Fe735Df95940D83aD5E9a8053804709",
+  WETH: "0xA07EA61f3401eD18d333D47C3bC860070df39205",
+  LINK: "0xE9235b4915D8248526895994d93F6d4c06B0dABb",
+  DAI: "0x4c094e79fca22E0ec335015d65E9B1DcED8EE7Cf",
 };
 
 // Sepolia 测试网 Chainlink 价格预言机地址
@@ -65,7 +65,7 @@ export const NETWORK_CONFIG = {
     symbol: "SEP",
     decimals: 18,
   },
-  rpcUrls: ["https://sepolia.infura.io/v3/YOUR-PROJECT-ID"],
+  rpcUrls: ["https://eth-sepolia.g.alchemy.com/v2/lK6-zMgLZpagSlTIbSg5G331IBJrfCQL"],
   blockExplorerUrls: ["https://sepolia.etherscan.io"],
 };
 
@@ -74,9 +74,9 @@ export function updateAddresses(deploymentInfo: any) {
   CONTRACT_ADDRESSES.MockFund = deploymentInfo.contracts.MockFund;
   CONTRACT_ADDRESSES.FundShareToken = deploymentInfo.contracts.FundShareToken;
   CONTRACT_ADDRESSES.MockUSDC = deploymentInfo.contracts.MockUSDC;
-  CONTRACT_ADDRESSES.MockTokens = deploymentInfo.contracts.MockTokens;
-  CONTRACT_ADDRESSES.PriceOracle = deploymentInfo.contracts.PriceOracle;
-  CONTRACT_ADDRESSES.MockUniswapIntegration = deploymentInfo.contracts.MockUniswapIntegration;
+  CONTRACT_ADDRESSES.MockTokensFactory = deploymentInfo.contracts.MockTokensFactory;
+  CONTRACT_ADDRESSES.ChainlinkPriceOracle = deploymentInfo.contracts.ChainlinkPriceOracle;
+  CONTRACT_ADDRESSES.UniswapIntegration = deploymentInfo.contracts.UniswapIntegration;
   
   CONTRACT_ADDRESSES.WBTC = deploymentInfo.tokens.WBTC;
   CONTRACT_ADDRESSES.WETH = deploymentInfo.tokens.WETH;

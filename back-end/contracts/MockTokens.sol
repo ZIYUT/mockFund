@@ -154,17 +154,17 @@ contract MockDAI is ERC20, Ownable {
 
 /**
  * @title MockTokensFactory
- * @dev 工厂合约，用于部署和管理所有模拟代币
+ * @dev Factory contract for deploying and managing all mock tokens
  */
 contract MockTokensFactory is Ownable {
     
-    // 代币地址映射
+    // Token address mappings
     address public wbtc;
     address public weth;
     address public link;
     address public dai;
     
-    // 事件
+    // Events
     event TokenDeployed(string symbol, address tokenAddress);
     
     constructor(address _initialOwner) Ownable(_initialOwner) {
@@ -172,32 +172,32 @@ contract MockTokensFactory is Ownable {
     }
     
     /**
-     * @dev 部署所有代币
+     * @dev Deploy all tokens
      */
     function deployAllTokens() external onlyOwner {
-        // 部署 WBTC
+        // Deploy WBTC
         MockWBTC wbtcToken = new MockWBTC(owner());
         wbtc = address(wbtcToken);
         emit TokenDeployed("WBTC", wbtc);
         
-        // 部署 WETH
+        // Deploy WETH
         MockWETH wethToken = new MockWETH(owner());
         weth = address(wethToken);
         emit TokenDeployed("WETH", weth);
         
-        // 部署 LINK
+        // Deploy LINK
         MockLINK linkToken = new MockLINK(owner());
         link = address(linkToken);
         emit TokenDeployed("LINK", link);
         
-        // 部署 DAI
+        // Deploy DAI
         MockDAI daiToken = new MockDAI(owner());
         dai = address(daiToken);
         emit TokenDeployed("DAI", dai);
     }
     
     /**
-     * @dev 获取所有代币地址
+     * @dev Get all token addresses
      */
     function getAllTokenAddresses() external view returns (
         address wbtcAddress,
@@ -209,7 +209,7 @@ contract MockTokensFactory is Ownable {
     }
     
     /**
-     * @dev 检查所有代币是否已部署
+     * @dev Check if all tokens are deployed
      */
     function areAllTokensDeployed() external view returns (bool) {
         return wbtc != address(0) && weth != address(0) && 

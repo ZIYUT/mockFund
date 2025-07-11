@@ -13,23 +13,23 @@ import "./UniswapIntegration.sol";
 contract MockFund is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // 常量
+    // Constants
     uint256 public constant BASIS_POINTS = 10000; // 100%
-    uint256 public constant INITIAL_MFC_SUPPLY = 1000000 * 10**18; // 100万MFC
-    uint256 public constant INITIAL_USDC_AMOUNT = 1000000 * 10**6; // 100万USDC
+    uint256 public constant INITIAL_MFC_SUPPLY = 1000000 * 10**18; // 1 million MFC
+    uint256 public constant INITIAL_USDC_AMOUNT = 1000000 * 10**6; // 1 million USDC
     uint256 public constant USDC_ALLOCATION = 5000; // 50% USDC
-    uint256 public constant TOKEN_ALLOCATION = 5000; // 50% 其他代币
-    uint256 public constant MANAGEMENT_FEE_INTERVAL = 1 days; // 管理费收取间隔
+    uint256 public constant TOKEN_ALLOCATION = 5000; // 50% other tokens
+    uint256 public constant MANAGEMENT_FEE_INTERVAL = 1 days; // Management fee collection interval
 
-    // 状态变量
+    // State variables
     FundShareToken public immutable shareToken;
     ChainlinkPriceOracle public immutable priceOracle;
     UniswapIntegration public immutable uniswapIntegration;
     
     address public usdcToken;
     address[] public supportedTokens;
-    mapping(address => uint256) public mfcTokenRatio; // 每个MFC包含的代币数量
-    uint256 public mfcUSDCAmount; // 每个MFC包含的USDC数量
+    mapping(address => uint256) public mfcTokenRatio; // Amount of tokens per MFC
+    uint256 public mfcUSDCAmount; // Amount of USDC per MFC
     
     bool public isInitialized;
     uint256 public minimumInvestment = 100 * 10**6; // 100 USDC
@@ -38,7 +38,7 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     uint256 public lastFeeCollection;
     uint256 public totalManagementFeesCollected;
 
-    // 事件
+    // Events
     event FundInitialized(uint256 initialSupply, uint256 initialUSDC);
     event Investment(address indexed investor, uint256 usdcAmount, uint256 mfcAmount);
     event Redemption(address indexed investor, uint256 shareAmount, uint256 usdcAmount);
@@ -64,9 +64,9 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 添加支持的代币
-     * @param _token 代币地址
-     * @param _allocation 分配比例（基点）
+     * @dev Add supported token
+     * @param _token Token address
+     * @param _allocation Allocation ratio (basis points)
      */
     function addSupportedToken(address _token, uint256 _allocation) external onlyOwner {
         require(_token != address(0), "Invalid token address");
@@ -78,34 +78,34 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 初始化基金，建立固定资产组合
-     * @param _initialUSDCAmount 初始USDC金额（必须是100万USDC）
+     * @dev Initialize fund with fixed asset portfolio
+     * @param _initialUSDCAmount Initial USDC amount (must be 1 million USDC)
      */
     function initializeFund(uint256 _initialUSDCAmount) external onlyOwner {
         require(!isInitialized, "Fund already initialized");
         require(_initialUSDCAmount == INITIAL_USDC_AMOUNT, "Initial amount must be 1M USDC");
         require(supportedTokens.length == 4, "Must have exactly 4 supported tokens");
         
-        // 转移初始USDC
+        // Transfer initial USDC
         IERC20(getUSDCAddress()).safeTransferFrom(msg.sender, address(this), _initialUSDCAmount);
         
-        // 计算每个代币的购买金额（50%中的25%，即总资金的12.5%）
-        uint256 tokenPurchaseAmount = (_initialUSDCAmount * TOKEN_ALLOCATION) / BASIS_POINTS; // 50万USDC
-        uint256 perTokenAmount = tokenPurchaseAmount / 4; // 每个代币12.5万USDC
+        // Calculate purchase amount for each token (25% of 50%, i.e., 12.5% of total funds)
+        uint256 tokenPurchaseAmount = (_initialUSDCAmount * TOKEN_ALLOCATION) / BASIS_POINTS; // 500k USDC
+        uint256 perTokenAmount = tokenPurchaseAmount / 4; // 125k USDC per token
         
-        // 购买代币并计算每个MFC包含的代币数量
+        // Purchase tokens and calculate token amount per MFC
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
             uint256 tokenAmount = _purchaseTokenWithUSDC(token, perTokenAmount);
             
-            // 计算每个MFC包含的代币数量
-            mfcTokenRatio[token] = tokenAmount / INITIAL_MFC_SUPPLY;
+            // Calculate token amount per MFC (maintain token precision)
+            mfcTokenRatio[token] = tokenAmount / (INITIAL_MFC_SUPPLY / 10**18);
         }
         
-        // 计算每个MFC包含的USDC数量
-        mfcUSDCAmount = (_initialUSDCAmount * USDC_ALLOCATION) / (BASIS_POINTS * INITIAL_MFC_SUPPLY);
+        // Calculate USDC amount per MFC (maintain USDC precision)
+        mfcUSDCAmount = (_initialUSDCAmount * USDC_ALLOCATION) / (BASIS_POINTS * (INITIAL_MFC_SUPPLY / 10**18));
         
-        // 铸造初始MFC给部署者
+        // Mint initial MFC to deployer
         shareToken.mint(msg.sender, INITIAL_MFC_SUPPLY);
         
         isInitialized = true;
@@ -114,16 +114,16 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 计算基金净值（NAV）
-     * @return nav 基金净值（以USDC计价）
+     * @dev Calculate fund Net Asset Value (NAV)
+     * @return nav Fund NAV (priced in USDC)
      */
     function calculateNAV() public view returns (uint256 nav) {
         require(isInitialized, "Fund not initialized");
         
-        // 计算USDC部分
+        // Calculate USDC portion
         uint256 usdcBalance = IERC20(getUSDCAddress()).balanceOf(address(this));
         
-        // 计算代币部分
+        // Calculate token portion
         uint256 tokenValue = 0;
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
@@ -137,40 +137,40 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 计算单个MFC的价值
-     * @return mfcValue 单个MFC的USDC价值
+     * @dev Calculate value of single MFC
+     * @return mfcValue USDC value of single MFC
      */
     function calculateMFCValue() public view returns (uint256 mfcValue) {
         require(isInitialized, "Fund not initialized");
         uint256 totalSupply = shareToken.totalSupply();
         if (totalSupply == 0) return 0;
         uint256 nav = calculateNAV();
-        // 修正精度：nav(6位) * 1e18 / totalSupply(18位)
+        // Fix precision: nav(6 decimals) * 1e18 / totalSupply(18 decimals)
         mfcValue = (nav * 1e18) / totalSupply;
     }
 
     /**
-     * @dev 投资USDC获得MFC
-     * @param _usdcAmount 投资USDC数量
+     * @dev Invest USDC to get MFC
+     * @param _usdcAmount Amount of USDC to invest
      */
     function invest(uint256 _usdcAmount) external nonReentrant whenNotPaused {
         require(isInitialized, "Fund not initialized");
         require(_usdcAmount >= minimumInvestment, "Investment below minimum");
         
-        // 收集管理费
+        // Collect management fee
         _collectManagementFee();
         
-        // 计算能获得的MFC数量（基于当前净值）
+        // Calculate MFC amount to receive (based on current NAV)
         uint256 mfcValue = calculateMFCValue();
         require(mfcValue > 0, "Invalid MFC value");
         
         uint256 mfcToMint = (_usdcAmount * 10**18) / mfcValue;
         require(mfcToMint > 0, "Invalid MFC amount");
         
-        // 转移USDC到合约
+        // Transfer USDC to contract
         IERC20(getUSDCAddress()).safeTransferFrom(msg.sender, address(this), _usdcAmount);
         
-        // 按照固定比例购买代币
+        // Purchase tokens according to fixed ratio
         uint256 tokenPurchaseAmount = (_usdcAmount * TOKEN_ALLOCATION) / BASIS_POINTS;
         uint256 perTokenAmount = tokenPurchaseAmount / 4;
         
@@ -179,15 +179,15 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
             _purchaseTokenWithUSDC(token, perTokenAmount);
         }
         
-        // 铸造MFC给投资者
+        // Mint MFC to investor
         shareToken.mint(msg.sender, mfcToMint);
         
         emit Investment(msg.sender, _usdcAmount, mfcToMint);
     }
 
     /**
-     * @dev 赎回MFC获得USDC
-     * @param _shareAmount 赎回MFC数量
+     * @dev Redeem MFC to get USDC
+     * @param _shareAmount Amount of MFC to redeem
      */
     function redeem(uint256 _shareAmount) external nonReentrant whenNotPaused {
         require(_shareAmount > 0, "Invalid share amount");
@@ -196,64 +196,67 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         // 收集管理费
         _collectManagementFee();
         
-        // 计算赎回的USDC价值
+        // Calculate USDC value of redemption
         uint256 usdcValue = _calculateRedemptionValue(_shareAmount);
         require(usdcValue >= minimumRedemption, "Redemption below minimum");
         
-        // 计算赎回管理费（1%）
+        // Calculate redemption management fee (1%)
         uint256 redemptionFee = (usdcValue * managementFeeRate) / BASIS_POINTS;
         uint256 netAmount = usdcValue - redemptionFee;
         
-        // 销毁MFC
+        // Burn MFC
         shareToken.burn(msg.sender, _shareAmount);
         
-        // 按比例卖出代币换成USDC
+        // Sell tokens proportionally for USDC
         _redeemTokensForUSDC(_shareAmount);
         
-        // 转移USDC给用户（99%）
+        // Transfer USDC to user (99%)
         IERC20(getUSDCAddress()).safeTransfer(msg.sender, netAmount);
         
-        // 累计管理费（1%）
+        // Accumulate management fee (1%)
         totalManagementFeesCollected += redemptionFee;
         
         emit Redemption(msg.sender, _shareAmount, netAmount);
     }
 
     /**
-     * @dev 使用USDC购买代币
-     * @param _token 要购买的代币
-     * @param _usdcAmount USDC数量
-     * @return tokenAmount 获得的代币数量
+     * @dev Purchase tokens with USDC
+     * @param _token Token to purchase
+     * @param _usdcAmount Amount of USDC
+     * @return tokenAmount Amount of tokens received
      */
     function _purchaseTokenWithUSDC(address _token, uint256 _usdcAmount) internal returns (uint256 tokenAmount) {
         if (_token == getUSDCAddress()) {
             return _usdcAmount;
         }
         
+        // Approve UniswapIntegration to spend USDC
+        IERC20(getUSDCAddress()).approve(address(uniswapIntegration), _usdcAmount);
+        
         try uniswapIntegration.swapExactInputSingle(
             getUSDCAddress(),
             _token,
             _usdcAmount,
             address(this),
-            3000 // 0.3% 费率
+            3000 // 0.3% fee
         ) returns (uint256 amountOut) {
             tokenAmount = amountOut;
         } catch {
-            // 如果交换失败，保留USDC
+            // If swap fails, keep USDC
             tokenAmount = 0;
         }
     }
 
     /**
-     * @dev 计算赎回价值
-     * @param _shareAmount MFC数量
-     * @return usdcValue USDC价值
+     * @dev Calculate redemption value
+     * @param _shareAmount Amount of MFC
+     * @return usdcValue USDC value
      */
     function _calculateRedemptionValue(uint256 _shareAmount) internal view returns (uint256 usdcValue) {
-        // 计算USDC部分
+        // Calculate USDC portion
         uint256 usdcPart = _shareAmount * mfcUSDCAmount;
         
-        // 计算代币部分
+        // Calculate token portion
         uint256 tokenPart = 0;
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
@@ -267,8 +270,8 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 赎回代币换成USDC
-     * @param _shareAmount MFC数量
+     * @dev Redeem tokens for USDC
+     * @param _shareAmount Amount of MFC
      */
     function _redeemTokensForUSDC(uint256 _shareAmount) internal {
         for (uint256 i = 0; i < supportedTokens.length; i++) {
@@ -285,34 +288,37 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 将代币换成USDC
-     * @param _token 代币地址
-     * @param _amount 代币数量
+     * @dev Swap tokens for USDC
+     * @param _token Token address
+     * @param _amount Amount of tokens
      */
     function _swapTokenForUSDC(address _token, uint256 _amount) internal {
         if (_token == getUSDCAddress()) {
             return;
         }
         
+        // Approve UniswapIntegration to spend token
+        IERC20(_token).approve(address(uniswapIntegration), _amount);
+        
         try uniswapIntegration.swapExactInputSingle(
             _token,
             getUSDCAddress(),
             _amount,
             address(this),
-            3000 // 0.3% 费率
+            3000 // 0.3% fee
         ) returns (uint256 /* amountOut */) {
-            // 交换成功
+            // Swap successful
         } catch {
-            // 如果交换失败，直接转移代币给用户
+            // If swap fails, transfer tokens directly to user
             IERC20(_token).safeTransfer(msg.sender, _amount);
         }
     }
 
     /**
-     * @dev 获取代币USDC价值
-     * @param _token 代币地址
-     * @param _amount 代币数量
-     * @return usdcValue USDC价值
+     * @dev Get token value in USDC
+     * @param _token Token address
+     * @param _amount Amount of tokens
+     * @return usdcValue USDC value
      */
     function _getTokenValueInUSDC(address _token, uint256 _amount) internal view returns (uint256 usdcValue) {
         if (_amount == 0) return 0;
@@ -321,18 +327,18 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         (int256 tokenPrice, ) = priceOracle.getLatestPrice(_token);
         require(tokenPrice > 0, "Invalid token price");
         
-        // Chainlink价格是8位小数，转换为USDC价值（6位精度）
-        // 公式：(amount * price) / (10^8) = USDC价值
+        // Chainlink price is 8 decimals, convert to USDC value (6 decimals precision)
+        // Formula: (amount * price) / (10^8) = USDC value
         return (_amount * uint256(tokenPrice)) / (10 ** 8);
     }
 
     /**
-     * @dev 收集管理费
+     * @dev Collect management fee
      */
     function _collectManagementFee() internal {
         if (block.timestamp < lastFeeCollection + MANAGEMENT_FEE_INTERVAL) return;
         
-        // 计算流通的MFC数量（排除发行者持有的MFC）
+        // Calculate circulating MFC amount (excluding issuer's holdings)
         uint256 totalSupply = FundShareToken(shareToken).totalSupply();
         uint256 ownerBalance = FundShareToken(shareToken).balanceOf(owner());
         uint256 circulatingSupply = totalSupply - ownerBalance;
@@ -342,11 +348,11 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
             return;
         }
         
-        // 计算管理费（1%）
+        // Calculate management fee (1%)
         uint256 feeAmount = (circulatingSupply * managementFeeRate) / BASIS_POINTS;
         
         if (feeAmount > 0) {
-            // 从USDC余额中扣除管理费
+            // Deduct management fee from USDC balance
             uint256 usdcBalance = IERC20(getUSDCAddress()).balanceOf(address(this));
             uint256 usdcFeeAmount = 0;
             
@@ -354,12 +360,12 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
                 usdcFeeAmount = feeAmount;
             } else {
                 usdcFeeAmount = usdcBalance;
-                // 需要卖出代币来补充USDC
+                // Need to sell tokens to supplement USDC
                 uint256 remainingFee = feeAmount - usdcBalance;
                 _sellTokensForManagementFee(remainingFee);
             }
             
-            // 累计管理费
+            // Accumulate management fee
             totalManagementFeesCollected += feeAmount;
             lastFeeCollection = block.timestamp;
             
@@ -368,26 +374,26 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 卖出代币收取管理费
-     * @param _requiredUSDC 需要的USDC数量
+     * @dev Sell tokens to collect management fee
+     * @param _requiredUSDC Required USDC amount
      */
     function _sellTokensForManagementFee(uint256 _requiredUSDC) internal {
         uint256 totalSold = 0;
         
-        // 按比例卖出代币
+        // Sell tokens proportionally
         for (uint256 i = 0; i < supportedTokens.length && totalSold < _requiredUSDC; i++) {
             address token = supportedTokens[i];
             uint256 tokenBalance = IERC20(token).balanceOf(address(this));
             
             if (tokenBalance > 0) {
-                // 计算需要卖出的代币数量
+                // Calculate amount of tokens to sell
                 uint256 remainingNeeded = _requiredUSDC - totalSold;
                 uint256 tokenValue = _getTokenValueInUSDC(token, tokenBalance);
                 
                 if (tokenValue > 0) {
                     uint256 tokensToSell = tokenBalance;
                     if (tokenValue > remainingNeeded) {
-                        // 按比例卖出
+                        // Sell proportionally
                         tokensToSell = (tokenBalance * remainingNeeded) / tokenValue;
                     }
                     
@@ -400,7 +406,7 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         }
     }
 
-    // 管理功能
+    // Management functions
     function collectManagementFee() external onlyOwner {
         _collectManagementFee();
     }
@@ -423,7 +429,7 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         return usdcToken;
     }
     
-    // 查询功能
+    // Query functions
     function getFundStats() external view returns (uint256, uint256, bool) {
         return (FundShareToken(shareToken).totalSupply(), INITIAL_MFC_SUPPLY, isInitialized);
     }
@@ -461,14 +467,14 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 获取累计管理费总额
+     * @dev Get total accumulated management fees
      */
     function getTotalManagementFees() external view returns (uint256) {
         return totalManagementFeesCollected;
     }
     
     /**
-     * @dev 获取流通的MFC数量（排除发行者持有的）
+     * @dev Get circulating MFC amount (excluding issuer's holdings)
      */
     function getCirculatingSupply() external view returns (uint256) {
         uint256 totalSupply = FundShareToken(shareToken).totalSupply();
@@ -477,11 +483,44 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev 获取基金净值信息
+     * @dev Get fund NAV information
      */
     function getFundNAV() external view returns (uint256 nav, uint256 mfcValue, uint256 totalSupply) {
         nav = calculateNAV();
         mfcValue = calculateMFCValue();
         totalSupply = shareToken.totalSupply();
+    }
+    
+    /**
+     * @dev Get fund token balances
+     * @return tokens Array of token addresses (including USDC)
+     * @return balances Array of token balances
+     * @return decimals Array of token decimals
+     */
+    function getFundTokenBalances() external view returns (
+        address[] memory tokens,
+        uint256[] memory balances,
+        uint8[] memory decimals
+    ) {
+        // Include USDC + supported tokens
+        uint256 totalTokens = supportedTokens.length + 1;
+        tokens = new address[](totalTokens);
+        balances = new uint256[](totalTokens);
+        decimals = new uint8[](totalTokens);
+        
+        // Add USDC first
+        tokens[0] = getUSDCAddress();
+        balances[0] = IERC20(getUSDCAddress()).balanceOf(address(this));
+        decimals[0] = 6; // USDC has 6 decimals
+        
+        // Add supported tokens
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
+            tokens[i + 1] = supportedTokens[i];
+            balances[i + 1] = IERC20(supportedTokens[i]).balanceOf(address(this));
+            
+            // Get token decimals (assume 18 for most tokens, 8 for WBTC)
+            // This is a simplified approach - in production, you'd query the token contract
+            decimals[i + 1] = 18; // Default to 18 decimals
+        }
     }
 }

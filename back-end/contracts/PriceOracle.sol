@@ -6,33 +6,33 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PriceOracle
- * @dev 使用 Sepolia Chainlink 真实价格预言机获取实时价格
+ * @dev Use Sepolia Chainlink real price oracles to get real-time prices
  */
 contract PriceOracle is Ownable {
     
-    // 代币地址到 Chainlink 价格预言机的映射
+    // Mapping from token address to Chainlink price oracle
     mapping(address => AggregatorV3Interface) public priceFeeds;
     
-    // Sepolia 测试网上的 Chainlink 价格预言机地址
+    // Chainlink price oracle addresses on Sepolia testnet
     mapping(string => address) public sepoliaPriceFeeds;
     
-    // 价格有效期（秒）
-    uint256 public constant PRICE_VALIDITY_PERIOD = 3600; // 1小时
+    // Price validity period (seconds)
+    uint256 public constant PRICE_VALIDITY_PERIOD = 3600; // 1 hour
     
-    // 事件
+    // Events
     event PriceFeedUpdated(address indexed token, address indexed priceFeed);
     event PriceRetrieved(address indexed token, int256 price, uint256 timestamp);
     
     constructor(address _initialOwner) Ownable(_initialOwner) {
-        // 初始化 Sepolia 测试网的价格预言机地址
+        // Initialize Sepolia testnet price oracle addresses
         _initializeSepoliaPriceFeeds();
     }
     
     /**
-     * @dev 初始化 Sepolia 测试网的价格预言机地址
+     * @dev Initialize Sepolia testnet price oracle addresses
      */
     function _initializeSepoliaPriceFeeds() internal {
-        // Sepolia 测试网上的 Chainlink 价格预言机地址
+        // Chainlink price oracle addresses on Sepolia testnet
         sepoliaPriceFeeds["ETH"] = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // ETH/USD
         sepoliaPriceFeeds["BTC"] = 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43; // BTC/USD
         sepoliaPriceFeeds["LINK"] = 0xc59E3633BAAC79493d908e63626716e204A45EdF; // LINK/USD
@@ -42,9 +42,9 @@ contract PriceOracle is Ownable {
     }
     
     /**
-     * @dev 设置代币的 Chainlink 价格预言机
-     * @param _token 代币地址
-     * @param _priceFeed Chainlink 价格预言机地址
+     * @dev Set Chainlink price oracle for token
+     * @param _token Token address
+     * @param _priceFeed Chainlink price oracle address
      */
     function setPriceFeed(address _token, address _priceFeed) external onlyOwner {
         require(_token != address(0), "Invalid token address");
@@ -55,9 +55,9 @@ contract PriceOracle is Ownable {
     }
     
     /**
-     * @dev 使用预定义的 Sepolia 价格预言机设置代币
-     * @param _token 代币地址
-     * @param _symbol 代币符号 (ETH, BTC, LINK, USDC, DAI)
+     * @dev Set token using predefined Sepolia price oracle
+     * @param _token Token address
+     * @param _symbol Token symbol (ETH, BTC, LINK, USDC, DAI)
      */
     function setPriceFeedBySymbol(address _token, string memory _symbol) external onlyOwner {
         require(_token != address(0), "Invalid token address");
@@ -70,10 +70,10 @@ contract PriceOracle is Ownable {
     }
     
     /**
-     * @dev 获取代币的最新价格（以 USD 计价）
-     * @param _token 代币地址
-     * @return price 价格（8位小数）
-     * @return timestamp 价格更新时间戳
+     * @dev Get latest price of token (in USD)
+     * @param _token Token address
+     * @return price Price (8 decimals)
+     * @return timestamp Price update timestamp
      */
     function getLatestPrice(address _token) external view returns (int256 price, uint256 timestamp) {
         AggregatorV3Interface priceFeed = priceFeeds[_token];
@@ -96,10 +96,10 @@ contract PriceOracle is Ownable {
     }
     
     /**
-     * @dev 批量获取多个代币的价格
-     * @param _tokens 代币地址数组
-     * @return prices 价格数组
-     * @return timestamps 时间戳数组
+     * @dev Batch get prices of multiple tokens
+     * @param _tokens Array of token addresses
+     * @return prices Array of prices
+     * @return timestamps Array of timestamps
      */
     function getMultiplePrices(address[] calldata _tokens) 
         external 
@@ -116,33 +116,33 @@ contract PriceOracle is Ownable {
     }
     
     /**
-     * @dev 计算代币价值（以 USDC 计价）
-     * @param _token 代币地址
-     * @param _amount 代币数量
-     * @return usdcValue USDC价值
+     * @dev Calculate token value (in USDC)
+     * @param _token Token address
+     * @param _amount Token amount
+     * @return usdcValue USDC value
      */
     function calculateTokenValue(address _token, uint256 _amount) external view returns (uint256 usdcValue) {
         (int256 price, ) = this.getLatestPrice(_token);
         require(price > 0, "Invalid price");
         
-        // Chainlink 价格通常是 8 位小数，转换为 6 位小数（USDC 格式）
-        // 公式：(amount * price) / (10^8) = USDC价值
+        // Chainlink price is usually 8 decimals, convert to 6 decimals (USDC format)
+        // Formula: (amount * price) / (10^8) = USDC value
         return (_amount * uint256(price)) / (10 ** 8);
     }
     
     /**
-     * @dev 检查价格预言机是否已设置
-     * @param _token 代币地址
-     * @return 是否已设置
+     * @dev Check if price oracle is set
+     * @param _token Token address
+     * @return Whether it is set
      */
     function isPriceFeedSet(address _token) external view returns (bool) {
         return address(priceFeeds[_token]) != address(0);
     }
     
     /**
-     * @dev 获取价格预言机的小数位数
-     * @param _token 代币地址
-     * @return 小数位数
+     * @dev Get decimal places of price oracle
+     * @param _token Token address
+     * @return Decimal places
      */
     function getPriceFeedDecimals(address _token) external view returns (uint8) {
         AggregatorV3Interface priceFeed = priceFeeds[_token];
@@ -151,21 +151,21 @@ contract PriceOracle is Ownable {
     }
     
     /**
-     * @dev 获取 Sepolia 价格预言机地址
-     * @param _symbol 代币符号
-     * @return 价格预言机地址
+     * @dev Get Sepolia price oracle address
+     * @param _symbol Token symbol
+     * @return Price oracle address
      */
     function getSepoliaPriceFeedAddress(string memory _symbol) external view returns (address) {
         return sepoliaPriceFeeds[_symbol];
     }
     
     /**
-     * @dev 获取价格预言机的详细信息
-     * @param _token 代币地址
-     * @return priceFeedAddress 价格预言机地址
-     * @return decimals 小数位数
-     * @return description 描述
-     * @return version 版本
+     * @dev Get detailed information of price oracle
+     * @param _token Token address
+     * @return priceFeedAddress Price oracle address
+     * @return decimals Decimal places
+     * @return description Description
+     * @return version Version
      */
     function getPriceFeedInfo(address _token) external view returns (
         address priceFeedAddress,

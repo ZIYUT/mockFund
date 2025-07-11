@@ -9,25 +9,25 @@ import "./ChainlinkPriceOracle.sol";
 
 /**
  * @title UniswapIntegration
- * @dev 使用 Chainlink 真实价格进行代币交换的集成合约
+ * @dev Integration contract for token swapping using Chainlink real prices
  */
 contract UniswapIntegration is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     
-    // Chainlink 价格预言机
+    // Chainlink price oracle
     ChainlinkPriceOracle public priceOracle;
     
-    // 缓存的价格（避免频繁调用 Chainlink）
+    // Cached prices (to avoid frequent Chainlink calls)
     mapping(address => mapping(address => uint256)) public cachedRates;
     mapping(address => mapping(address => uint256)) public rateTimestamps;
     
-    // 价格缓存时间（5分钟）
+    // Price cache duration (5 minutes)
     uint256 public constant CACHE_DURATION = 300;
     
-    // 滑点容忍度（默认 1%）
+    // Slippage tolerance (default 1%)
     uint256 public slippageTolerance = 100; // 100 basis points = 1%
     
-    // 事件
+    // Events
     event TokenSwapped(
         address indexed tokenIn,
         address indexed tokenOut,
@@ -51,8 +51,8 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 设置价格预言机
-     * @param _priceOracle 新的价格预言机地址
+     * @dev Set price oracle
+     * @param _priceOracle New price oracle address
      */
     function setPriceOracle(address _priceOracle) external onlyOwner {
         require(_priceOracle != address(0), "Invalid price oracle address");
@@ -62,21 +62,21 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 设置滑点容忍度
-     * @param _slippageTolerance 滑点容忍度（基点）
+     * @dev Set slippage tolerance
+     * @param _slippageTolerance Slippage tolerance (basis points)
      */
     function setSlippageTolerance(uint256 _slippageTolerance) external onlyOwner {
-        require(_slippageTolerance <= 1000, "Slippage tolerance too high"); // 最大 10%
+        require(_slippageTolerance <= 1000, "Slippage tolerance too high"); // Maximum 10%
         uint256 oldTolerance = slippageTolerance;
         slippageTolerance = _slippageTolerance;
         emit SlippageToleranceUpdated(oldTolerance, _slippageTolerance);
     }
     
     /**
-     * @dev 从 Chainlink 获取真实价格并计算交换比率
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
-     * @return rate 交换比率（基点）
+     * @dev Get real prices from Chainlink and calculate exchange rate
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
+     * @return rate Exchange rate (basis points)
      */
     function calculateRealExchangeRate(
         address _tokenIn,
@@ -90,7 +90,7 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
             try priceOracle.getLatestPrice(_tokenOut) returns (int256 priceOut, uint256) {
                 require(priceIn > 0 && priceOut > 0, "Invalid prices from oracle");
                 
-                // 计算交换比率：1 tokenIn = ? tokenOut
+                // Calculate exchange rate: 1 tokenIn = ? tokenOut
                 // rate = (priceIn / priceOut) * 10000 (basis points)
                 rate = uint256(priceIn * 10000) / uint256(priceOut);
                 
@@ -105,9 +105,9 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 更新缓存的交换比率
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
+     * @dev Update cached exchange rate
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
      */
     function updateCachedRate(address _tokenIn, address _tokenOut) external {
         uint256 rate = calculateRealExchangeRate(_tokenIn, _tokenOut);
@@ -118,9 +118,9 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 批量更新缓存的交换比率
-     * @param _tokensIn 输入代币地址数组
-     * @param _tokensOut 输出代币地址数组
+     * @dev Batch update cached exchange rates
+     * @param _tokensIn Array of input token addresses
+     * @param _tokensOut Array of output token addresses
      */
     function batchUpdateCachedRates(
         address[] calldata _tokensIn,
@@ -134,33 +134,33 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 获取交换比率（优先使用缓存）
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
-     * @return rate 交换比率
+     * @dev Get exchange rate (prioritize cache)
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
+     * @return rate Exchange rate
      */
     function getExchangeRate(
         address _tokenIn,
         address _tokenOut
     ) public view returns (uint256 rate) {
-        // 检查缓存是否有效
+        // Check if cache is valid
         uint256 cachedRate = cachedRates[_tokenIn][_tokenOut];
         uint256 timestamp = rateTimestamps[_tokenIn][_tokenOut];
         
         if (cachedRate > 0 && (block.timestamp - timestamp) < CACHE_DURATION) {
             rate = cachedRate;
         } else {
-            // 缓存过期或不存在，从 Chainlink 获取实时价格
+            // Cache expired or doesn't exist, get real-time price from Chainlink
             rate = calculateRealExchangeRate(_tokenIn, _tokenOut);
         }
     }
     
     /**
-     * @dev 获取交换报价
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
-     * @param _amountIn 输入代币数量
-     * @return amountOut 预期输出数量
+     * @dev Get swap quote
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
+     * @param _amountIn Input token amount
+     * @return amountOut Expected output amount
      */
     function getQuote(
         address _tokenIn,
@@ -173,12 +173,12 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 执行精确输入交换（使用真实价格）
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
-     * @param _amountIn 输入代币数量
-     * @param _recipient 接收者地址
-     * @return amountOut 实际输出数量
+     * @dev Execute exact input swap (using real prices)
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
+     * @param _amountIn Input token amount
+     * @param _recipient Recipient address
+     * @return amountOut Actual output amount
      */
     function swapExactInputSingle(
         address _tokenIn,
@@ -190,22 +190,22 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         require(_amountIn > 0, "Invalid input amount");
         require(_recipient != address(0), "Invalid recipient");
         
-        // 获取实时交换比率
+        // Get real-time exchange rate
         uint256 rate = getExchangeRate(_tokenIn, _tokenOut);
         
-        // 计算输出数量
+        // Calculate output amount
         amountOut = (_amountIn * rate) / 10000;
         
-        // 应用滑点保护
+        // Apply slippage protection
         uint256 minAmountOut = amountOut * (10000 - slippageTolerance) / 10000;
         
-        // 转移输入代币到合约
+        // Transfer input tokens to contract
         IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
         
-        // 模拟铸造输出代币给接收者
+        // Simulate minting output tokens to recipient
         _mintOrTransferToken(_tokenOut, _recipient, amountOut);
         
-        // 更新缓存
+        // Update cache
         cachedRates[_tokenIn][_tokenOut] = rate;
         rateTimestamps[_tokenIn][_tokenOut] = block.timestamp;
         
@@ -213,13 +213,13 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 批量交换代币（用于投资时的代币分配）
-     * @param _tokenIn 输入代币地址
-     * @param _tokensOut 输出代币地址数组
-     * @param _amountsIn 输入代币数量数组
-     * @param _recipient 接收者地址
-     * @param _fees 池费率数组（忽略，仅为兼容性）
-     * @return amountsOut 实际输出数量数组
+     * @dev Batch swap tokens (for token allocation during investment)
+     * @param _tokenIn Input token address
+     * @param _tokensOut Array of output token addresses
+     * @param _amountsIn Array of input token amounts
+     * @param _recipient Recipient address
+     * @param _fees Array of pool fees (ignored, for compatibility only)
+     * @return amountsOut Array of actual output amounts
      */
     function batchSwap(
         address _tokenIn,
@@ -235,26 +235,26 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         uint256 length = _tokensOut.length;
         amountsOut = new uint256[](length);
         
-        // 计算总输入数量
+        // Calculate total input amount
         uint256 totalAmountIn = 0;
         for (uint256 i = 0; i < length; i++) {
             totalAmountIn += _amountsIn[i];
         }
         
-        // 转移总输入代币到合约
+        // Transfer total input tokens to contract
         IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), totalAmountIn);
         
-        // 执行批量交换
+        // Execute batch swap
         for (uint256 i = 0; i < length; i++) {
             if (_amountsIn[i] > 0) {
-                // 获取实时交换比率
+                // Get real-time exchange rate
                 uint256 rate = getExchangeRate(_tokenIn, _tokensOut[i]);
                 amountsOut[i] = (_amountsIn[i] * rate) / 10000;
                 
-                // 模拟铸造输出代币给接收者
+                // Simulate minting output tokens to recipient
                 _mintOrTransferToken(_tokensOut[i], _recipient, amountsOut[i]);
                 
-                // 更新缓存
+                // Update cache
                 cachedRates[_tokenIn][_tokensOut[i]] = rate;
                 rateTimestamps[_tokenIn][_tokensOut[i]] = block.timestamp;
                 
@@ -264,37 +264,37 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 模拟铸造或转移代币
-     * @param _token 代币地址
-     * @param _recipient 接收者地址
-     * @param _amount 数量
+     * @dev Simulate minting or transferring tokens
+     * @param _token Token address
+     * @param _recipient Recipient address
+     * @param _amount Amount
      */
     function _mintOrTransferToken(
         address _token,
         address _recipient,
         uint256 _amount
     ) internal {
-        // 首先检查合约是否有足够的代币余额
+        // First check if contract has sufficient token balance
         uint256 balance = IERC20(_token).balanceOf(address(this));
         if (balance >= _amount) {
             IERC20(_token).safeTransfer(_recipient, _amount);
             return;
         }
         
-        // 如果余额不足，尝试调用代币的 mint 函数（如果存在）
+        // If balance insufficient, try calling token's mint function (if exists)
         try this._callMint(_token, _recipient, _amount) {
-            // 铸造成功
+            // Minting successful
         } catch {
-            // 如果铸造也失败，这是一个测试环境的限制
+            // If minting also fails, this is a test environment limitation
             revert("Insufficient token balance for swap");
         }
     }
     
     /**
-     * @dev 外部调用铸造函数（用于 try-catch）
-     * @param _token 代币地址
-     * @param _recipient 接收者地址
-     * @param _amount 数量
+     * @dev External call to mint function (for try-catch)
+     * @param _token Token address
+     * @param _recipient Recipient address
+     * @param _amount Amount
      */
     function _callMint(
         address _token,
@@ -303,7 +303,7 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     ) external {
         require(msg.sender == address(this), "Only self call allowed");
         
-        // 尝试调用 mint 函数
+        // Try calling mint function
         (bool success, ) = _token.call(
             abi.encodeWithSignature("mint(address,uint256)", _recipient, _amount)
         );
@@ -311,12 +311,12 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 获取缓存信息
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
-     * @return cachedRate 缓存的比率
-     * @return timestamp 缓存时间戳
-     * @return isStale 是否过期
+     * @dev Get cache information
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
+     * @return cachedRate Cached rate
+     * @return timestamp Cache timestamp
+     * @return isStale Whether expired
      */
     function getCacheInfo(
         address _tokenIn,
@@ -332,9 +332,9 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 清除缓存
-     * @param _tokenIn 输入代币地址
-     * @param _tokenOut 输出代币地址
+     * @dev Clear cache
+     * @param _tokenIn Input token address
+     * @param _tokenOut Output token address
      */
     function clearCache(address _tokenIn, address _tokenOut) external onlyOwner {
         delete cachedRates[_tokenIn][_tokenOut];
@@ -342,11 +342,11 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 紧急提取代币（仅限所有者）
-     * @param _token 代币地址
-     * @param _amount 提取数量
+     * @dev Emergency withdraw tokens (owner only)
+     * @param _token Token address
+     * @param _amount Withdrawal amount
      */
     function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(owner(), _amount);
     }
-} 
+}

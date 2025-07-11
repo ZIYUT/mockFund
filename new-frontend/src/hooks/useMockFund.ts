@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useContractRead, useContractWrite, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, parseUnits, formatEther, formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from '../../contracts/addresses';
-import MockFundABI from '@/contracts/abis/MockFund.json';
-import MockUSDCABI from '@/contracts/abis/MockUSDC.json';
-import FundShareTokenABI from '@/contracts/abis/FundShareToken.json';
+import MockFundABI from '../contracts/abis/MockFund.json';
+import MockUSDCABI from '../contracts/abis/MockUSDC.json';
+import FundShareTokenABI from '../contracts/abis/FundShareToken.json';
 
 export function useMockFund() {
   const { address, isConnected } = useAccount();
@@ -12,7 +12,7 @@ export function useMockFund() {
   const [error, setError] = useState<string | null>(null);
 
   // 读取基金状态
-  const { data: isInitialized, error: initError, isLoading: initLoading } = useContractRead({
+  const { data: isInitialized, error: initError, isLoading: initLoading, refetch: refetchInitialized } = useReadContract({
     address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
     abi: MockFundABI.abi,
     functionName: 'isInitialized',
@@ -22,75 +22,76 @@ export function useMockFund() {
   });
 
   // 读取基金净值
-  const { data: nav, refetch: refetchNav } = useContractRead({
+  const { data: nav, refetch: refetchNav } = useReadContract({
     address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
     abi: MockFundABI.abi,
     functionName: 'calculateNAV',
-    enabled: isInitialized as boolean,
+    query: {
+      enabled: isInitialized as boolean,
+    },
   });
 
   // 读取MFC价值
-  const { data: mfcValue, refetch: refetchMfcValue } = useContractRead({
+  const { data: mfcValue, refetch: refetchMfcValue } = useReadContract({
     address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
     abi: MockFundABI.abi,
     functionName: 'calculateMFCValue',
-    enabled: isInitialized as boolean,
+    query: {
+      enabled: isInitialized as boolean,
+    },
   });
 
   // 读取支持的代币
-  const { data: supportedTokens, refetch: refetchSupportedTokens } = useContractRead({
+  const { data: supportedTokens, refetch: refetchSupportedTokens } = useReadContract({
     address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
     abi: MockFundABI.abi,
     functionName: 'getSupportedTokens',
   });
 
   // 读取用户MFC余额
-  const { data: userMfcBalance, refetch: refetchUserMfcBalance } = useContractRead({
+  const { data: userMfcBalance, refetch: refetchUserMfcBalance } = useReadContract({
     address: CONTRACT_ADDRESSES.FundShareToken as `0x${string}`,
     abi: FundShareTokenABI.abi,
     functionName: 'balanceOf',
     args: [address as `0x${string}`],
-    enabled: isConnected && !!address,
+    query: {
+      enabled: isConnected && !!address,
+    },
   });
 
   // 读取用户USDC余额
-  const { data: userUsdcBalance, refetch: refetchUserUsdcBalance } = useContractRead({
+  const { data: userUsdcBalance, refetch: refetchUserUsdcBalance } = useReadContract({
     address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
     abi: MockUSDCABI.abi,
     functionName: 'balanceOf',
     args: [address as `0x${string}`],
-    enabled: isConnected && !!address,
+    query: {
+      enabled: isConnected && !!address,
+    },
   });
 
   // 读取USDC授权额度
-  const { data: usdcAllowance, refetch: refetchUsdcAllowance } = useContractRead({
+  const { data: usdcAllowance, refetch: refetchUsdcAllowance } = useReadContract({
     address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
     abi: MockUSDCABI.abi,
     functionName: 'allowance',
     args: [address as `0x${string}`, CONTRACT_ADDRESSES.MockFund as `0x${string}`],
-    enabled: isConnected && !!address,
+    query: {
+      enabled: isConnected && !!address,
+    },
   });
 
   // 投资函数
-  const { data: investData, write: invest, isPending: isInvesting } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
-    abi: MockFundABI.abi,
-    functionName: 'invest',
-  });
+  const { data: investData, writeContract: invest, isPending: isInvesting } = useWriteContract();
 
   // 赎回函数
-  const { data: redeemData, write: redeem, isPending: isRedeeming } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
-    abi: MockFundABI.abi,
-    functionName: 'redeem',
-  });
+  const { data: redeemData, writeContract: redeem, isPending: isRedeeming } = useWriteContract();
 
   // 授权USDC函数
-  const { data: approveData, write: approveUsdc, isPending: isApproving } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
-    abi: MockUSDCABI.abi,
-    functionName: 'approve',
-  });
+  const { data: approveData, writeContract: approveUsdc, isPending: isApproving } = useWriteContract();
+
+  // 铸造测试USDC函数
+  const { data: mintData, writeContract: mintUSDC, isPending: isMinting } = useWriteContract();
 
   // 等待交易确认
   const { isLoading: isInvestTxLoading } = useWaitForTransactionReceipt({
@@ -147,7 +148,12 @@ export function useMockFund() {
       }
 
       // 执行投资
-      invest({ args: [amountInWei] });
+      invest({
+        address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
+        abi: MockFundABI.abi,
+        functionName: 'invest',
+        args: [amountInWei],
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '投资失败');
@@ -176,7 +182,12 @@ export function useMockFund() {
       }
 
       // 执行赎回
-      redeem({ args: [amountInWei] });
+      redeem({
+        address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
+        abi: MockFundABI.abi,
+        functionName: 'redeem',
+        args: [amountInWei],
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '赎回失败');
@@ -199,7 +210,12 @@ export function useMockFund() {
       const amountInWei = parseUnits(amount, 6); // USDC有6位小数
 
       // 执行授权
-      approveUsdc({ args: [CONTRACT_ADDRESSES.MockFund as `0x${string}`, amountInWei] });
+      approveUsdc({
+        address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
+        abi: MockUSDCABI.abi,
+        functionName: 'approve',
+        args: [CONTRACT_ADDRESSES.MockFund as `0x${string}`, amountInWei],
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '授权失败');
@@ -208,7 +224,15 @@ export function useMockFund() {
     }
   };
 
-  // 获取测试USDC
+  // 等待铸造交易确认
+  const { isLoading: isMintTxLoading } = useWaitForTransactionReceipt({
+    hash: mintData?.hash,
+    onSuccess: () => {
+      refetchUserUsdcBalance();
+    },
+  });
+
+  // 获取测试USDC（自定义金额）
   const getTestUsdc = async (amount: string = "1000") => {
     if (!isConnected || !address) {
       setError('请先连接钱包');
@@ -221,9 +245,65 @@ export function useMockFund() {
 
       const amountInWei = parseUnits(amount, 6);
       
-      // 这里需要调用MockUSDC的mint函数，但需要部署者权限
-      // 在实际应用中，可能需要通过水龙头或其他方式获取测试代币
-      setError('请联系管理员获取测试USDC');
+      // 调用MockUSDC的mint函数（现在是公共函数，任何人都可以调用）
+      mintUSDC({
+        address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
+        abi: MockUSDCABI.abi,
+        functionName: 'mint',
+        args: [address as `0x${string}`, amountInWei],
+      });
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '获取测试USDC失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 快速获取1000个测试USDC
+  const getQuickTestUsdc = async () => {
+    if (!isConnected || !address) {
+      setError('请先连接钱包');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // 调用MockUSDC的getTestTokens函数（固定1000 USDC）
+      mintUSDC({
+        address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
+        abi: MockUSDCABI.abi,
+        functionName: 'getTestTokens',
+        args: [],
+      });
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '获取测试USDC失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 获取大量测试USDC（100,000个）
+  const getLargeTestUsdc = async () => {
+    if (!isConnected || !address) {
+      setError('请先连接钱包');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // 调用MockUSDC的getLargeAmount函数（固定100,000 USDC）
+      mintUSDC({
+        address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
+        abi: MockUSDCABI.abi,
+        functionName: 'getLargeAmount',
+        args: [],
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取测试USDC失败');
@@ -236,7 +316,7 @@ export function useMockFund() {
     // 状态
     isConnected,
     address,
-    isLoading: isLoading || isInvesting || isRedeeming || isApproving || isInvestTxLoading || isRedeemTxLoading || isApproveTxLoading,
+    isLoading: isLoading || isInvesting || isRedeeming || isApproving || isMinting || isInvestTxLoading || isRedeemTxLoading || isApproveTxLoading || isMintTxLoading,
     error,
     
     // 基金数据
@@ -255,6 +335,9 @@ export function useMockFund() {
     handleRedeem,
     handleApproveUsdc,
     getTestUsdc,
+    getQuickTestUsdc,
+    getLargeTestUsdc,
+    mintUSDC,
     
     // 刷新函数
     refetchNav,
@@ -264,4 +347,4 @@ export function useMockFund() {
     refetchUsdcAllowance,
     refetchSupportedTokens,
   };
-} 
+}

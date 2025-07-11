@@ -163,7 +163,7 @@ export default function FundRedemption() {
         <ul className="text-sm text-gray-600 space-y-1">
           <li>• 赎回将按当前MFC价值计算</li>
           <li>• 赎回费用为1%，从赎回金额中扣除</li>
-          <li>• 最小赎回金额为100 USDC等值</li>
+          <li>• 最小赎回金额为10 USDC等值</li>
           <li>• 赎回后MFC将被销毁</li>
         </ul>
       </div>

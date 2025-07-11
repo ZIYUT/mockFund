@@ -2,7 +2,7 @@
 
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { config } from '@/config/web3';
+import { config } from '@/lib/web3';
 import { useState, useEffect } from 'react';
 
 export default function Web3Provider({ children }: { children: React.ReactNode }) {

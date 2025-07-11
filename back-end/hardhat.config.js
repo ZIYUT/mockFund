@@ -24,7 +24,9 @@ module.exports = {
       url: process.env.SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/your-project-id",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
-      gasPrice: 20000000000, // 20 gwei
+      gas: 6000000, // 增加gas限制
+      gasPrice: 50000000000, // 50 gwei，提高gas价格
+      timeout: 60000, // 60秒超时
     },
   },
   etherscan: {

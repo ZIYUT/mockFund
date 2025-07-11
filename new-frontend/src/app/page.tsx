@@ -6,6 +6,7 @@ import WalletConnect from '@/components/WalletConnect';
 import FundInvestment from '@/components/FundInvestment';
 import FundRedemption from '@/components/FundRedemption';
 import DebugInfo from '@/components/DebugInfo';
+import GetTestTokens from '@/components/GetTestTokens';
 import { useMockFund } from '@/hooks/useMockFund';
 
 export default function Home() {
@@ -51,9 +52,10 @@ export default function Home() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* 左侧：钱包连接 */}
-          <div className="lg:col-span-1">
+          {/* 左侧：钱包连接和获取测试代币 */}
+          <div className="lg:col-span-1 space-y-6">
             <WalletConnect />
+            <GetTestTokens />
           </div>
 
           {/* 右侧：投资/赎回功能 */}

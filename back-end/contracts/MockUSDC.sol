@@ -25,9 +25,10 @@ contract MockUSDC is ERC20, Ownable {
         return 6;
     }
 
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external {
         require(to != address(0), "Cannot mint to zero address");
         require(amount > 0, "Amount must be greater than zero");
+        require(amount <= 100000 * 10**decimals(), "Amount too large"); // Maximum 100,000 USDC per mint
         
         _mint(to, amount);
         emit TokensMinted(to, amount);
@@ -69,7 +70,7 @@ contract MockUSDC is ERC20, Ownable {
     }
     
     /**
-     * @dev 为测试目的快速获取大量USDC
+     * @dev Quickly get large amount of USDC for testing purposes
      */
     function getLargeAmount() external {
         uint256 largeAmount = 100000 * 10**decimals(); // 100,000 USDC
@@ -78,7 +79,7 @@ contract MockUSDC is ERC20, Ownable {
     }
     
     /**
-     * @dev 为合约地址铸造USDC（用于测试）
+     * @dev Mint USDC for contract address (for testing)
      */
     function mintForContract(address contractAddress, uint256 amount) external onlyOwner {
         require(contractAddress != address(0), "Invalid contract address");

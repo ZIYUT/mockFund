@@ -28,8 +28,8 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 设置基金合约地址
-     * @param _fundContract 基金合约地址
+     * @dev Set fund contract address
+     * @param _fundContract Fund contract address
      */
     function setFundContract(address _fundContract) external onlyOwner {
         require(_fundContract != address(0), "Invalid fund contract address");
@@ -38,9 +38,9 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 铸造代币（仅限基金合约或所有者）
-     * @param _to 接收者地址
-     * @param _amount 数量
+     * @dev Mint tokens (only fund contract or owner)
+     * @param _to Recipient address
+     * @param _amount Amount
      */
     function mint(address _to, uint256 _amount) external {
         require(_to != address(0), "Cannot mint to zero address");
@@ -55,9 +55,9 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 销毁代币（仅限基金合约或所有者）
-     * @param _from 销毁者地址
-     * @param _amount 数量
+     * @dev Burn tokens (only fund contract or owner)
+     * @param _from Burner address
+     * @param _amount Amount
      */
     function burn(address _from, uint256 _amount) external {
         require(_amount > 0, "Amount must be greater than zero");
@@ -71,9 +71,9 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
 
     /**
-     * @dev 批量铸造代币
-     * @param _recipients 接收者地址数组
-     * @param _amounts 数量数组
+     * @dev Batch mint tokens
+     * @param _recipients Array of recipient addresses
+     * @param _amounts Array of amounts
      */
     function batchMint(address[] calldata _recipients, uint256[] calldata _amounts) external onlyOwner {
         require(_recipients.length == _amounts.length, "Arrays length mismatch");
@@ -89,8 +89,8 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 为测试目的铸造代币
-     * @param _amount 数量
+     * @dev Mint tokens for testing purposes
+     * @param _amount Amount
      */
     function mintForTesting(uint256 _amount) external {
         require(_amount > 0, "Amount must be greater than zero");
@@ -101,21 +101,21 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 暂停合约
+     * @dev Pause contract
      */
     function pause() external onlyOwner {
         _pause();
     }
     
     /**
-     * @dev 恢复合约
+     * @dev Unpause contract
      */
     function unpause() external onlyOwner {
         _unpause();
     }
     
     /**
-     * @dev 重写 transfer 函数，添加暂停检查
+     * @dev Override transfer function with pause check
      */
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
         require(!Pausable.paused(), "Token transfer paused");
@@ -123,7 +123,7 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 重写 transferFrom 函数，添加暂停检查
+     * @dev Override transferFrom function with pause check
      */
     function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
         require(!Pausable.paused(), "Token transfer paused");
@@ -131,10 +131,10 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev 获取代币统计信息
-     * @return totalSupply 总供应量
-     * @return fundContractAddress 基金合约地址
-     * @return isPaused 是否暂停
+     * @dev Get token statistics
+     * @return totalSupply Total supply
+     * @return fundContractAddress Fund contract address
+     * @return isPaused Whether paused
      */
     function getTokenStats() external view returns (
         uint256 totalSupply,
@@ -145,9 +145,9 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
 
     /**
-     * @dev 检查地址是否为基金合约
-     * @param _address 要检查的地址
-     * @return 是否为基金合约
+     * @dev Check if address is fund contract
+     * @param _address Address to check
+     * @return Whether it is fund contract
      */
     function isFundContract(address _address) external view returns (bool) {
         return _address == fundContract;

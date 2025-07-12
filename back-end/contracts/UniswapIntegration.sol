@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./ChainlinkPriceOracle.sol";
 
 /**
  * @title UniswapIntegration
- * @dev Integration contract for token swapping using Chainlink real prices
+ * @dev Integration contract with fixed rates for initialization and real Chainlink prices for other operations
  */
 contract UniswapIntegration is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -17,12 +18,20 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     // Chainlink price oracle
     ChainlinkPriceOracle public priceOracle;
     
-    // Cached prices (to avoid frequent Chainlink calls)
-    mapping(address => mapping(address => uint256)) public cachedRates;
-    mapping(address => mapping(address => uint256)) public rateTimestamps;
+    // Fixed rates for initialization (USDC per token, scaled by 1e6)
+    mapping(address => uint256) public fixedRates;
     
-    // Price cache duration (5 minutes)
-    uint256 public constant CACHE_DURATION = 300;
+    // Mode control
+    bool public useFixedRates = false;
+    
+    // Authorized callers for minting
+    mapping(address => bool) public authorizedCallers;
+    
+    // Predefined fixed rates (USDC per token)
+    uint256 public constant USDC_PER_ETH = 3000 * 1e6;   // 3000 USDC per ETH
+    uint256 public constant USDC_PER_BTC = 118000 * 1e6; // 118000 USDC per BTC
+    uint256 public constant USDC_PER_LINK = 15 * 1e6;    // 15 USDC per LINK
+    uint256 public constant USDC_PER_DAI = 1 * 1e6;      // 1 USDC per DAI
     
     // Slippage tolerance (default 1%)
     uint256 public slippageTolerance = 100; // 100 basis points = 1%
@@ -34,20 +43,87 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         uint256 amountIn,
         uint256 amountOut,
         address indexed recipient,
-        uint256 rate
-    );
-    event RateUpdated(
-        address indexed tokenIn,
-        address indexed tokenOut,
         uint256 rate,
-        uint256 timestamp
+        bool usedFixedRate
     );
-    event SlippageToleranceUpdated(uint256 oldTolerance, uint256 newTolerance);
+    event FixedRateSet(address indexed token, uint256 rate);
+    event FixedRateModeToggled(bool enabled);
     event PriceOracleUpdated(address indexed oldOracle, address indexed newOracle);
     
     constructor(address _initialOwner, address _priceOracle) Ownable(_initialOwner) {
         require(_priceOracle != address(0), "Invalid price oracle address");
         priceOracle = ChainlinkPriceOracle(_priceOracle);
+        
+        // Set default fixed rates (USDC per token, scaled by 1e6)
+        // ETH: 3000 USDC/ETH
+        // BTC: 118000 USDC/BTC  
+        // LINK: 15 USDC/LINK
+        // DAI: 1 USDC/DAI
+    }
+    
+    /**
+     * @dev Initialize fixed rates for supported tokens
+     * @param _wethAddress WETH token address
+     * @param _wbtcAddress WBTC token address
+     * @param _linkAddress LINK token address
+     * @param _daiAddress DAI token address
+     */
+    function initializeFixedRates(
+        address _wethAddress,
+        address _wbtcAddress,
+        address _linkAddress,
+        address _daiAddress
+    ) external onlyOwner {
+        require(_wethAddress != address(0), "Invalid WETH address");
+        require(_wbtcAddress != address(0), "Invalid WBTC address");
+        require(_linkAddress != address(0), "Invalid LINK address");
+        require(_daiAddress != address(0), "Invalid DAI address");
+        
+        fixedRates[_wethAddress] = USDC_PER_ETH;
+        fixedRates[_wbtcAddress] = USDC_PER_BTC;
+        fixedRates[_linkAddress] = USDC_PER_LINK;
+        fixedRates[_daiAddress] = USDC_PER_DAI;
+        
+        emit FixedRateSet(_wethAddress, USDC_PER_ETH);
+        emit FixedRateSet(_wbtcAddress, USDC_PER_BTC);
+        emit FixedRateSet(_linkAddress, USDC_PER_LINK);
+        emit FixedRateSet(_daiAddress, USDC_PER_DAI);
+    }
+    
+    /**
+     * @dev Set fixed rate for a token (USDC per token)
+     * @param _token Token address
+     * @param _rate Rate in USDC (scaled by 1e6, e.g., 3000000000 for 3000 USDC/ETH)
+     */
+    function setFixedRate(address _token, uint256 _rate) external onlyOwner {
+        require(_token != address(0), "Invalid token address");
+        require(_rate > 0, "Rate must be positive");
+        fixedRates[_token] = _rate;
+        emit FixedRateSet(_token, _rate);
+    }
+    
+    /**
+     * @dev Batch set fixed rates
+     * @param _tokens Array of token addresses
+     * @param _rates Array of rates
+     */
+    function batchSetFixedRates(address[] calldata _tokens, uint256[] calldata _rates) external onlyOwner {
+        require(_tokens.length == _rates.length, "Arrays length mismatch");
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            require(_tokens[i] != address(0), "Invalid token address");
+            require(_rates[i] > 0, "Rate must be positive");
+            fixedRates[_tokens[i]] = _rates[i];
+            emit FixedRateSet(_tokens[i], _rates[i]);
+        }
+    }
+    
+    /**
+     * @dev Toggle fixed rate mode
+     * @param _enabled Whether to use fixed rates
+     */
+    function setFixedRateMode(bool _enabled) external onlyOwner {
+        useFixedRates = _enabled;
+        emit FixedRateModeToggled(_enabled);
     }
     
     /**
@@ -62,23 +138,21 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev Set slippage tolerance
-     * @param _slippageTolerance Slippage tolerance (basis points)
+     * @dev Authorize a caller for minting
+     * @param _caller Caller address
+     * @param _authorized Whether to authorize
      */
-    function setSlippageTolerance(uint256 _slippageTolerance) external onlyOwner {
-        require(_slippageTolerance <= 1000, "Slippage tolerance too high"); // Maximum 10%
-        uint256 oldTolerance = slippageTolerance;
-        slippageTolerance = _slippageTolerance;
-        emit SlippageToleranceUpdated(oldTolerance, _slippageTolerance);
+    function setAuthorizedCaller(address _caller, bool _authorized) external onlyOwner {
+        authorizedCallers[_caller] = _authorized;
     }
     
     /**
-     * @dev Get real prices from Chainlink and calculate exchange rate
+     * @dev Get exchange rate between two tokens
      * @param _tokenIn Input token address
      * @param _tokenOut Output token address
-     * @return rate Exchange rate (basis points)
+     * @return rate Exchange rate (output tokens per input token, scaled appropriately)
      */
-    function calculateRealExchangeRate(
+    function getExchangeRate(
         address _tokenIn,
         address _tokenOut
     ) public view returns (uint256 rate) {
@@ -86,72 +160,47 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         require(_tokenOut != address(0), "Invalid token out address");
         require(_tokenIn != _tokenOut, "Tokens must be different");
         
-        try priceOracle.getLatestPrice(_tokenIn) returns (int256 priceIn, uint256) {
-            try priceOracle.getLatestPrice(_tokenOut) returns (int256 priceOut, uint256) {
-                require(priceIn > 0 && priceOut > 0, "Invalid prices from oracle");
-                
-                // Calculate exchange rate: 1 tokenIn = ? tokenOut
-                // rate = (priceIn / priceOut) * 10000 (basis points)
-                rate = uint256(priceIn * 10000) / uint256(priceOut);
-                
-                require(rate > 0, "Invalid exchange rate");
-                
-            } catch {
-                revert("Failed to get token out price from oracle");
+        if (useFixedRates) {
+            // Use fixed rates
+            uint256 rateIn = fixedRates[_tokenIn];
+            uint256 rateOut = fixedRates[_tokenOut];
+            
+            require(rateIn > 0 && rateOut > 0, "Fixed rates not set");
+            
+            // Calculate rate: tokenIn -> tokenOut
+            // For USDC -> Token: rate = 1 / tokenPrice (how many tokens per USDC)
+            // For Token -> USDC: rate = tokenPrice (how much USDC per token)
+            // Both rates are scaled by 1e6, so we need to adjust for 18 decimal precision
+            
+            // Get token decimals for proper scaling
+            uint8 tokenInDecimals = _getTokenDecimals(_tokenIn);
+            uint8 tokenOutDecimals = _getTokenDecimals(_tokenOut);
+            
+            // Calculate base rate: rateOut / rateIn (output token price / input token price)
+            rate = (rateIn * 1e18) / rateOut;
+            
+            // Adjust for decimal differences
+            if (tokenOutDecimals > tokenInDecimals) {
+                rate = rate * (10 ** (tokenOutDecimals - tokenInDecimals));
+            } else if (tokenInDecimals > tokenOutDecimals) {
+                rate = rate / (10 ** (tokenInDecimals - tokenOutDecimals));
             }
-        } catch {
-            revert("Failed to get token in price from oracle");
-        }
-    }
-    
-    /**
-     * @dev Update cached exchange rate
-     * @param _tokenIn Input token address
-     * @param _tokenOut Output token address
-     */
-    function updateCachedRate(address _tokenIn, address _tokenOut) external {
-        uint256 rate = calculateRealExchangeRate(_tokenIn, _tokenOut);
-        cachedRates[_tokenIn][_tokenOut] = rate;
-        rateTimestamps[_tokenIn][_tokenOut] = block.timestamp;
-        
-        emit RateUpdated(_tokenIn, _tokenOut, rate, block.timestamp);
-    }
-    
-    /**
-     * @dev Batch update cached exchange rates
-     * @param _tokensIn Array of input token addresses
-     * @param _tokensOut Array of output token addresses
-     */
-    function batchUpdateCachedRates(
-        address[] calldata _tokensIn,
-        address[] calldata _tokensOut
-    ) external {
-        require(_tokensIn.length == _tokensOut.length, "Arrays length mismatch");
-        
-        for (uint256 i = 0; i < _tokensIn.length; i++) {
-            this.updateCachedRate(_tokensIn[i], _tokensOut[i]);
-        }
-    }
-    
-    /**
-     * @dev Get exchange rate (prioritize cache)
-     * @param _tokenIn Input token address
-     * @param _tokenOut Output token address
-     * @return rate Exchange rate
-     */
-    function getExchangeRate(
-        address _tokenIn,
-        address _tokenOut
-    ) public view returns (uint256 rate) {
-        // Check if cache is valid
-        uint256 cachedRate = cachedRates[_tokenIn][_tokenOut];
-        uint256 timestamp = rateTimestamps[_tokenIn][_tokenOut];
-        
-        if (cachedRate > 0 && (block.timestamp - timestamp) < CACHE_DURATION) {
-            rate = cachedRate;
         } else {
-            // Cache expired or doesn't exist, get real-time price from Chainlink
-            rate = calculateRealExchangeRate(_tokenIn, _tokenOut);
+            // Use Chainlink real prices
+            try priceOracle.getLatestPrice(_tokenIn) returns (int256 priceIn, uint256) {
+                try priceOracle.getLatestPrice(_tokenOut) returns (int256 priceOut, uint256) {
+                    require(priceIn > 0 && priceOut > 0, "Invalid prices from oracle");
+                    
+                    // Calculate exchange rate: 1 tokenIn = ? tokenOut
+                    // rate = (priceIn / priceOut) * 1e18
+                    rate = (uint256(priceIn) * 1e18) / uint256(priceOut);
+                    
+                } catch {
+                    revert("Failed to get token out price from oracle");
+                }
+            } catch {
+                revert("Failed to get token in price from oracle");
+            }
         }
     }
     
@@ -169,11 +218,11 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         uint24 /* _fee */
     ) external view returns (uint256 amountOut) {
         uint256 rate = getExchangeRate(_tokenIn, _tokenOut);
-        amountOut = (_amountIn * rate) / 10000;
+        amountOut = (_amountIn * rate) / 1e18;
     }
     
     /**
-     * @dev Execute exact input swap (using real prices)
+     * @dev Execute exact input swap
      * @param _tokenIn Input token address
      * @param _tokenOut Output token address
      * @param _amountIn Input token amount
@@ -190,35 +239,29 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         require(_amountIn > 0, "Invalid input amount");
         require(_recipient != address(0), "Invalid recipient");
         
-        // Get real-time exchange rate
+        // Get exchange rate
         uint256 rate = getExchangeRate(_tokenIn, _tokenOut);
         
         // Calculate output amount
-        amountOut = (_amountIn * rate) / 10000;
-        
-        // Apply slippage protection
-        uint256 minAmountOut = amountOut * (10000 - slippageTolerance) / 10000;
+        amountOut = (_amountIn * rate) / 1e18;
+        require(amountOut > 0, "Invalid output amount");
         
         // Transfer input tokens to contract
         IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
         
-        // Simulate minting output tokens to recipient
+        // Mint or transfer output tokens to recipient
         _mintOrTransferToken(_tokenOut, _recipient, amountOut);
         
-        // Update cache
-        cachedRates[_tokenIn][_tokenOut] = rate;
-        rateTimestamps[_tokenIn][_tokenOut] = block.timestamp;
-        
-        emit TokenSwapped(_tokenIn, _tokenOut, _amountIn, amountOut, _recipient, rate);
+        emit TokenSwapped(_tokenIn, _tokenOut, _amountIn, amountOut, _recipient, rate, useFixedRates);
     }
     
     /**
-     * @dev Batch swap tokens (for token allocation during investment)
+     * @dev Batch swap tokens
      * @param _tokenIn Input token address
      * @param _tokensOut Array of output token addresses
      * @param _amountsIn Array of input token amounts
      * @param _recipient Recipient address
-     * @param _fees Array of pool fees (ignored, for compatibility only)
+     * @param _fees Array of pool fees (ignored)
      * @return amountsOut Array of actual output amounts
      */
     function batchSwap(
@@ -247,24 +290,20 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         // Execute batch swap
         for (uint256 i = 0; i < length; i++) {
             if (_amountsIn[i] > 0) {
-                // Get real-time exchange rate
+                // Get exchange rate
                 uint256 rate = getExchangeRate(_tokenIn, _tokensOut[i]);
-                amountsOut[i] = (_amountsIn[i] * rate) / 10000;
+                amountsOut[i] = (_amountsIn[i] * rate) / 1e18;
                 
-                // Simulate minting output tokens to recipient
+                // Mint or transfer output tokens to recipient
                 _mintOrTransferToken(_tokensOut[i], _recipient, amountsOut[i]);
                 
-                // Update cache
-                cachedRates[_tokenIn][_tokensOut[i]] = rate;
-                rateTimestamps[_tokenIn][_tokensOut[i]] = block.timestamp;
-                
-                emit TokenSwapped(_tokenIn, _tokensOut[i], _amountsIn[i], amountsOut[i], _recipient, rate);
+                emit TokenSwapped(_tokenIn, _tokensOut[i], _amountsIn[i], amountsOut[i], _recipient, rate, useFixedRates);
             }
         }
     }
     
     /**
-     * @dev Simulate minting or transferring tokens
+     * @dev Mint or transfer tokens
      * @param _token Token address
      * @param _recipient Recipient address
      * @param _amount Amount
@@ -301,7 +340,13 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
         address _recipient,
         uint256 _amount
     ) external {
-        require(msg.sender == address(this), "Only self call allowed");
+        // Allow calls from this contract, the owner, or authorized callers
+        require(
+            msg.sender == address(this) || 
+            msg.sender == owner() || 
+            authorizedCallers[msg.sender], 
+            "Unauthorized call"
+        );
         
         // Try calling mint function
         (bool success, ) = _token.call(
@@ -311,42 +356,42 @@ contract UniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev Get cache information
-     * @param _tokenIn Input token address
-     * @param _tokenOut Output token address
-     * @return cachedRate Cached rate
-     * @return timestamp Cache timestamp
-     * @return isStale Whether expired
-     */
-    function getCacheInfo(
-        address _tokenIn,
-        address _tokenOut
-    ) external view returns (
-        uint256 cachedRate,
-        uint256 timestamp,
-        bool isStale
-    ) {
-        cachedRate = cachedRates[_tokenIn][_tokenOut];
-        timestamp = rateTimestamps[_tokenIn][_tokenOut];
-        isStale = (block.timestamp - timestamp) >= CACHE_DURATION;
-    }
-    
-    /**
-     * @dev Clear cache
-     * @param _tokenIn Input token address
-     * @param _tokenOut Output token address
-     */
-    function clearCache(address _tokenIn, address _tokenOut) external onlyOwner {
-        delete cachedRates[_tokenIn][_tokenOut];
-        delete rateTimestamps[_tokenIn][_tokenOut];
-    }
-    
-    /**
      * @dev Emergency withdraw tokens (owner only)
      * @param _token Token address
      * @param _amount Withdrawal amount
      */
     function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(owner(), _amount);
+    }
+    
+    /**
+     * @dev Get token decimals
+     * @param _token Token address
+     * @return decimals Token decimals
+     */
+    function _getTokenDecimals(address _token) internal view returns (uint8 decimals) {
+        try IERC20Metadata(_token).decimals() returns (uint8 tokenDecimals) {
+            return tokenDecimals;
+        } catch {
+            // Fallback to 18 decimals if query fails
+            return 18;
+        }
+    }
+    
+    /**
+     * @dev Get fixed rate for a token
+     * @param _token Token address
+     * @return rate Fixed rate (USDC per token, scaled by 1e6)
+     */
+    function getFixedRate(address _token) external view returns (uint256 rate) {
+        return fixedRates[_token];
+    }
+    
+    /**
+     * @dev Check if fixed rate mode is enabled
+     * @return enabled Whether fixed rate mode is enabled
+     */
+    function isFixedRateMode() external view returns (bool enabled) {
+        return useFixedRates;
     }
 }

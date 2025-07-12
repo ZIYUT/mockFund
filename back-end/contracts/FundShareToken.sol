@@ -89,18 +89,6 @@ contract FundShareToken is ERC20, Ownable, Pausable {
     }
     
     /**
-     * @dev Mint tokens for testing purposes
-     * @param _amount Amount
-     */
-    function mintForTesting(uint256 _amount) external {
-        require(_amount > 0, "Amount must be greater than zero");
-        require(_amount <= 10000 * 10**decimals(), "Amount too large"); // Maximum 10,000 tokens
-        
-        _mint(msg.sender, _amount);
-        emit TokensMinted(msg.sender, _amount);
-    }
-    
-    /**
      * @dev Pause contract
      */
     function pause() external onlyOwner {

@@ -2,16 +2,15 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./FundShareToken.sol";
 import "./ChainlinkPriceOracle.sol";
-import "./FixedRateUniswapIntegration.sol";
+import "./UniswapIntegration.sol";
 
-contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
+contract MockFund is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // Constants
@@ -20,19 +19,17 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     uint256 public constant INITIAL_USDC_AMOUNT = 1000000 * 10**6; // 1 million USDC
     uint256 public constant USDC_ALLOCATION = 5000; // 50% USDC
     uint256 public constant TOKEN_ALLOCATION = 5000; // 50% other tokens
-    uint256 public constant MANAGEMENT_FEE_INTERVAL = 1 days;
+    uint256 public constant MANAGEMENT_FEE_INTERVAL = 1 days; // Management fee collection interval
 
     // State variables
     FundShareToken public immutable shareToken;
     ChainlinkPriceOracle public immutable priceOracle;
-    FixedRateUniswapIntegration public immutable uniswapIntegration;
+    UniswapIntegration public immutable uniswapIntegration;
     
     address public usdcToken;
     address[] public supportedTokens;
-    
-    // Fixed composition per MFC (calculated during initialization)
-    mapping(address => uint256) public mfcTokenRatio; // Amount of tokens per MFC (with token decimals)
-    uint256 public mfcUSDCAmount; // Amount of USDC per MFC (with 6 decimals)
+    mapping(address => uint256) public mfcTokenRatio; // Amount of tokens per MFC
+    uint256 public mfcUSDCAmount; // Amount of USDC per MFC
     
     bool public isInitialized;
     uint256 public minimumInvestment = 100 * 10**6; // 100 USDC
@@ -47,7 +44,6 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     event Redemption(address indexed investor, uint256 shareAmount, uint256 usdcAmount);
     event ManagementFeeCollected(uint256 feeAmount, uint256 timestamp, uint256 totalFees);
     event SupportedTokenAdded(address token, uint256 allocation);
-    event TokenCompositionSet(address token, uint256 amountPerMFC);
 
     constructor(
         string memory _shareTokenName,
@@ -62,7 +58,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         
         shareToken = new FundShareToken(_shareTokenName, _shareTokenSymbol, address(this));
         priceOracle = ChainlinkPriceOracle(_priceOracle);
-        uniswapIntegration = FixedRateUniswapIntegration(_uniswapIntegration);
+        uniswapIntegration = UniswapIntegration(_uniswapIntegration);
         managementFeeRate = _managementFeeRate;
         lastFeeCollection = block.timestamp;
     }
@@ -82,7 +78,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Initialize fund with fixed rates and precise token allocation
+     * @dev Initialize fund with fixed asset portfolio
      * @param _initialUSDCAmount Initial USDC amount (must be 1 million USDC)
      */
     function initializeFund(uint256 _initialUSDCAmount) external onlyOwner {
@@ -90,48 +86,24 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         require(_initialUSDCAmount == INITIAL_USDC_AMOUNT, "Initial amount must be 1M USDC");
         require(supportedTokens.length == 4, "Must have exactly 4 supported tokens");
         
-        // Note: Fixed rate mode should be enabled before calling this function
-        // We don't call setFixedRateMode here to avoid ownership issues
-        
         // Transfer initial USDC
         IERC20(getUSDCAddress()).safeTransferFrom(msg.sender, address(this), _initialUSDCAmount);
         
-        // Calculate USDC allocation: 50% stays as USDC
-        uint256 usdcToKeep = (_initialUSDCAmount * USDC_ALLOCATION) / BASIS_POINTS; // 500,000 USDC
-        uint256 usdcForTokens = _initialUSDCAmount - usdcToKeep; // 500,000 USDC
+        // Calculate purchase amount for each token (25% of 50%, i.e., 12.5% of total funds)
+        uint256 tokenPurchaseAmount = (_initialUSDCAmount * TOKEN_ALLOCATION) / BASIS_POINTS; // 500k USDC
+        uint256 perTokenAmount = tokenPurchaseAmount / 4; // 125k USDC per token
         
-        // Each token gets 12.5% of total fund (125,000 USDC worth)
-        uint256 perTokenUSDC = usdcForTokens / 4; // 125,000 USDC per token
-        
-        // Purchase tokens using fixed rates and calculate precise composition
+        // Purchase tokens and calculate token amount per MFC
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
-            uint256 tokenAmount = _purchaseTokenWithFixedRate(token, perTokenUSDC);
+            uint256 tokenAmount = _purchaseTokenWithUSDC(token, perTokenAmount);
             
-            // Calculate exact token amount per MFC
-            // tokenAmount has token's native decimals
-            // INITIAL_MFC_SUPPLY has 18 decimals
-            // Scale tokenAmount to 18 decimals for consistent storage
-            uint8 tokenDecimals = _getTokenDecimals(token);
-            uint256 scaledTokenAmount;
-            if (tokenDecimals <= 18) {
-                scaledTokenAmount = tokenAmount * (10 ** (18 - tokenDecimals));
-            } else {
-                scaledTokenAmount = tokenAmount / (10 ** (tokenDecimals - 18));
-            }
-            // To avoid precision loss, multiply by 1e18 before dividing
-            // This gives us the ratio with 18 decimal places of precision
-            mfcTokenRatio[token] = (scaledTokenAmount * 1e18) / INITIAL_MFC_SUPPLY;
-            
-            emit TokenCompositionSet(token, mfcTokenRatio[token]);
+            // Calculate token amount per MFC (maintain token precision)
+            mfcTokenRatio[token] = tokenAmount / (INITIAL_MFC_SUPPLY / 10**18);
         }
         
-        // Calculate USDC amount per MFC
-        // usdcToKeep has 6 decimals, INITIAL_MFC_SUPPLY has 18 decimals
-        mfcUSDCAmount = (usdcToKeep * 1e18) / INITIAL_MFC_SUPPLY;
-        
-        // Note: Fixed rate mode should be disabled after initialization by the deployer
-        // We don't call setFixedRateMode here to avoid ownership issues
+        // Calculate USDC amount per MFC (maintain USDC precision)
+        mfcUSDCAmount = (_initialUSDCAmount * USDC_ALLOCATION) / (BASIS_POINTS * (INITIAL_MFC_SUPPLY / 10**18));
         
         // Mint initial MFC to deployer
         shareToken.mint(msg.sender, INITIAL_MFC_SUPPLY);
@@ -140,68 +112,9 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         
         emit FundInitialized(INITIAL_MFC_SUPPLY, _initialUSDCAmount);
     }
-    
-    /**
-     * @dev Purchase tokens using fixed rates
-     * @param _token Token to purchase
-     * @param _usdcAmount Amount of USDC to spend
-     * @return tokenAmount Amount of tokens received
-     */
-    function _purchaseTokenWithFixedRate(address _token, uint256 _usdcAmount) internal returns (uint256 tokenAmount) {
-        if (_token == getUSDCAddress()) {
-            return _usdcAmount;
-        }
-        
-        // Get fixed rate (USDC per token, scaled by 1e6)
-        uint256 fixedRate = uniswapIntegration.getFixedRate(_token);
-        require(fixedRate > 0, "Fixed rate not set for token");
-        
-        // Calculate token amount based on fixed rate
-        // For example: 125,000 USDC (125000 * 1e6) / 115,000 USDC per WBTC (115000 * 1e6) = 1.087 WBTC
-        // fixedRate is scaled by 1e6, _usdcAmount is scaled by 1e6
-        // Result should be in token's native decimals
-        
-        // Get token decimals
-        uint8 tokenDecimals = _getTokenDecimals(_token);
-        
-        // Simple calculation: tokenAmount = _usdcAmount / fixedRate * 10^tokenDecimals
-        // _usdcAmount is scaled by 1e6, fixedRate is scaled by 1e6
-        // So: tokenAmount = (_usdcAmount * 10^tokenDecimals) / fixedRate
-        tokenAmount = (_usdcAmount * (10 ** tokenDecimals)) / fixedRate;
-        
-        // Approve and execute swap
-        IERC20(getUSDCAddress()).approve(address(uniswapIntegration), _usdcAmount);
-        
-        uint256 actualAmount = uniswapIntegration.swapExactInputSingle(
-            getUSDCAddress(),
-            _token,
-            _usdcAmount,
-            address(this),
-            3000
-        );
-        
-        // Use calculated amount for precision
-        return tokenAmount;
-    }
-    
-    /**
-     * @dev Get token decimals
-     * @param _token Token address
-     * @return decimals Token decimals
-     */
-    function _getTokenDecimals(address _token) internal view returns (uint8 decimals) {
-        // For known tokens, return specific decimals
-        // In production, you would query the token contract
-        try IERC20Metadata(_token).decimals() returns (uint8 tokenDecimals) {
-            return tokenDecimals;
-        } catch {
-            // Fallback to 18 decimals if query fails
-            return 18;
-        }
-    }
 
     /**
-     * @dev Calculate fund Net Asset Value (NAV) using real-time Chainlink prices
+     * @dev Calculate fund Net Asset Value (NAV)
      * @return nav Fund NAV (priced in USDC)
      */
     function calculateNAV() public view returns (uint256 nav) {
@@ -210,7 +123,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         // Calculate USDC portion
         uint256 usdcBalance = IERC20(getUSDCAddress()).balanceOf(address(this));
         
-        // Calculate token portion using real-time Chainlink prices
+        // Calculate token portion
         uint256 tokenValue = 0;
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
@@ -224,7 +137,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Calculate value of single MFC using real-time prices
+     * @dev Calculate value of single MFC
      * @return mfcValue USDC value of single MFC
      */
     function calculateMFCValue() public view returns (uint256 mfcValue) {
@@ -232,42 +145,8 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         uint256 totalSupply = shareToken.totalSupply();
         if (totalSupply == 0) return 0;
         uint256 nav = calculateNAV();
-        // nav(6 decimals) * 1e18 / totalSupply(18 decimals) = mfcValue(6 decimals)
+        // Fix precision: nav(6 decimals) * 1e18 / totalSupply(18 decimals)
         mfcValue = (nav * 1e18) / totalSupply;
-    }
-    
-    /**
-     * @dev Calculate theoretical MFC value based on fixed composition and real-time prices
-     * @return theoreticalValue Theoretical USDC value of single MFC
-     */
-    function calculateTheoreticalMFCValue() public view returns (uint256 theoreticalValue) {
-        require(isInitialized, "Fund not initialized");
-        
-        // Calculate USDC portion
-        uint256 usdcPortion = mfcUSDCAmount / 1e12; // Convert from 18 decimals to 6 decimals
-        
-        // Calculate token portion using real-time prices
-        uint256 tokenPortion = 0;
-        for (uint256 i = 0; i < supportedTokens.length; i++) {
-            address token = supportedTokens[i];
-            uint256 tokenAmountPerMFC = mfcTokenRatio[token]; // This is scaled by 1e18
-            
-            // Convert to actual token amount (convert back to token's native decimals)
-            uint8 tokenDecimals = _getTokenDecimals(token);
-            uint256 actualTokenAmount;
-            if (tokenDecimals <= 18) {
-                actualTokenAmount = tokenAmountPerMFC / (10 ** (18 - tokenDecimals)) / 1e18;
-            } else {
-                actualTokenAmount = tokenAmountPerMFC * (10 ** (tokenDecimals - 18)) / 1e18;
-            }
-            
-            if (actualTokenAmount > 0) {
-                uint256 tokenValue = _getTokenValueInUSDC(token, actualTokenAmount);
-                tokenPortion += tokenValue;
-            }
-        }
-        
-        theoreticalValue = usdcPortion + tokenPortion;
     }
 
     /**
@@ -285,7 +164,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         uint256 mfcValue = calculateMFCValue();
         require(mfcValue > 0, "Invalid MFC value");
         
-        uint256 mfcToMint = (_usdcAmount * 1e18) / mfcValue;
+        uint256 mfcToMint = (_usdcAmount * 10**18) / mfcValue;
         require(mfcToMint > 0, "Invalid MFC amount");
         
         // Transfer USDC to contract
@@ -307,17 +186,17 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Redeem MFC to get USDC (using real-time prices)
+     * @dev Redeem MFC to get USDC
      * @param _shareAmount Amount of MFC to redeem
      */
     function redeem(uint256 _shareAmount) external nonReentrant whenNotPaused {
         require(_shareAmount > 0, "Invalid share amount");
-        require(shareToken.balanceOf(msg.sender) >= _shareAmount, "Insufficient shares");
+        require(FundShareToken(shareToken).balanceOf(msg.sender) >= _shareAmount, "Insufficient shares");
         
-        // Collect management fee
+        // 收集管理费
         _collectManagementFee();
         
-        // Calculate USDC value of redemption using real-time prices
+        // Calculate USDC value of redemption
         uint256 usdcValue = _calculateRedemptionValue(_shareAmount);
         require(usdcValue >= minimumRedemption, "Redemption below minimum");
         
@@ -328,20 +207,20 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         // Burn MFC
         shareToken.burn(msg.sender, _shareAmount);
         
-        // Sell tokens proportionally for USDC using real-time prices
+        // Sell tokens proportionally for USDC
         _redeemTokensForUSDC(_shareAmount);
         
-        // Transfer USDC to user
+        // Transfer USDC to user (99%)
         IERC20(getUSDCAddress()).safeTransfer(msg.sender, netAmount);
         
-        // Accumulate management fee
+        // Accumulate management fee (1%)
         totalManagementFeesCollected += redemptionFee;
         
         emit Redemption(msg.sender, _shareAmount, netAmount);
     }
 
     /**
-     * @dev Purchase tokens with USDC (using real-time prices)
+     * @dev Purchase tokens with USDC
      * @param _token Token to purchase
      * @param _usdcAmount Amount of USDC
      * @return tokenAmount Amount of tokens received
@@ -359,7 +238,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
             _token,
             _usdcAmount,
             address(this),
-            3000
+            3000 // 0.3% fee
         ) returns (uint256 amountOut) {
             tokenAmount = amountOut;
         } catch {
@@ -369,31 +248,21 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Calculate redemption value using real-time prices
+     * @dev Calculate redemption value
      * @param _shareAmount Amount of MFC
      * @return usdcValue USDC value
      */
     function _calculateRedemptionValue(uint256 _shareAmount) internal view returns (uint256 usdcValue) {
-        // Calculate proportional USDC amount
-        uint256 usdcPart = (_shareAmount * mfcUSDCAmount) / 1e18;
+        // Calculate USDC portion
+        uint256 usdcPart = _shareAmount * mfcUSDCAmount;
         
-        // Calculate proportional token amounts and their real-time values
+        // Calculate token portion
         uint256 tokenPart = 0;
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
-            uint256 tokenAmountPerMFC = (_shareAmount * mfcTokenRatio[token]) / 1e18;
-            
-            // Convert to actual token amount (convert back to token's native decimals)
-            uint8 tokenDecimals = _getTokenDecimals(token);
-            uint256 actualTokenAmount;
-            if (tokenDecimals <= 18) {
-                actualTokenAmount = tokenAmountPerMFC / (10 ** (18 - tokenDecimals));
-            } else {
-                actualTokenAmount = tokenAmountPerMFC * (10 ** (tokenDecimals - 18)) / 1e18;
-            }
-            
-            if (actualTokenAmount > 0) {
-                tokenPart += _getTokenValueInUSDC(token, actualTokenAmount);
+            uint256 tokenAmount = _shareAmount * mfcTokenRatio[token];
+            if (tokenAmount > 0) {
+                tokenPart += _getTokenValueInUSDC(token, tokenAmount);
             }
         }
         
@@ -401,34 +270,25 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Redeem tokens for USDC using real-time prices
+     * @dev Redeem tokens for USDC
      * @param _shareAmount Amount of MFC
      */
     function _redeemTokensForUSDC(uint256 _shareAmount) internal {
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
-            uint256 tokenAmountPerMFC = (_shareAmount * mfcTokenRatio[token]) / 1e18;
+            uint256 tokenAmount = _shareAmount * mfcTokenRatio[token];
             
-            // Convert to actual token amount (convert back to token's native decimals)
-            uint8 tokenDecimals = _getTokenDecimals(token);
-            uint256 actualTokenAmount;
-            if (tokenDecimals <= 18) {
-                actualTokenAmount = tokenAmountPerMFC / (10 ** (18 - tokenDecimals));
-            } else {
-                actualTokenAmount = tokenAmountPerMFC * (10 ** (tokenDecimals - 18)) / 1e18;
-            }
-            
-            if (actualTokenAmount > 0) {
+            if (tokenAmount > 0) {
                 uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-                if (tokenBalance >= actualTokenAmount) {
-                    _swapTokenForUSDC(token, actualTokenAmount);
+                if (tokenBalance >= tokenAmount) {
+                    _swapTokenForUSDC(token, tokenAmount);
                 }
             }
         }
     }
 
     /**
-     * @dev Swap tokens for USDC using real-time prices
+     * @dev Swap tokens for USDC
      * @param _token Token address
      * @param _amount Amount of tokens
      */
@@ -445,7 +305,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
             getUSDCAddress(),
             _amount,
             address(this),
-            3000
+            3000 // 0.3% fee
         ) returns (uint256 /* amountOut */) {
             // Swap successful
         } catch {
@@ -455,7 +315,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Get token value in USDC using real-time Chainlink prices
+     * @dev Get token value in USDC
      * @param _token Token address
      * @param _amount Amount of tokens
      * @return usdcValue USDC value
@@ -479,8 +339,8 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         if (block.timestamp < lastFeeCollection + MANAGEMENT_FEE_INTERVAL) return;
         
         // Calculate circulating MFC amount (excluding issuer's holdings)
-        uint256 totalSupply = shareToken.totalSupply();
-        uint256 ownerBalance = shareToken.balanceOf(owner());
+        uint256 totalSupply = FundShareToken(shareToken).totalSupply();
+        uint256 ownerBalance = FundShareToken(shareToken).balanceOf(owner());
         uint256 circulatingSupply = totalSupply - ownerBalance;
         
         if (circulatingSupply == 0) {
@@ -492,10 +352,57 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         uint256 feeAmount = (circulatingSupply * managementFeeRate) / BASIS_POINTS;
         
         if (feeAmount > 0) {
+            // Deduct management fee from USDC balance
+            uint256 usdcBalance = IERC20(getUSDCAddress()).balanceOf(address(this));
+            uint256 usdcFeeAmount = 0;
+            
+            if (usdcBalance >= feeAmount) {
+                usdcFeeAmount = feeAmount;
+            } else {
+                usdcFeeAmount = usdcBalance;
+                // Need to sell tokens to supplement USDC
+                uint256 remainingFee = feeAmount - usdcBalance;
+                _sellTokensForManagementFee(remainingFee);
+            }
+            
+            // Accumulate management fee
             totalManagementFeesCollected += feeAmount;
             lastFeeCollection = block.timestamp;
             
             emit ManagementFeeCollected(feeAmount, block.timestamp, totalManagementFeesCollected);
+        }
+    }
+
+    /**
+     * @dev Sell tokens to collect management fee
+     * @param _requiredUSDC Required USDC amount
+     */
+    function _sellTokensForManagementFee(uint256 _requiredUSDC) internal {
+        uint256 totalSold = 0;
+        
+        // Sell tokens proportionally
+        for (uint256 i = 0; i < supportedTokens.length && totalSold < _requiredUSDC; i++) {
+            address token = supportedTokens[i];
+            uint256 tokenBalance = IERC20(token).balanceOf(address(this));
+            
+            if (tokenBalance > 0) {
+                // Calculate amount of tokens to sell
+                uint256 remainingNeeded = _requiredUSDC - totalSold;
+                uint256 tokenValue = _getTokenValueInUSDC(token, tokenBalance);
+                
+                if (tokenValue > 0) {
+                    uint256 tokensToSell = tokenBalance;
+                    if (tokenValue > remainingNeeded) {
+                        // Sell proportionally
+                        tokensToSell = (tokenBalance * remainingNeeded) / tokenValue;
+                    }
+                    
+                    if (tokensToSell > 0) {
+                        _swapTokenForUSDC(token, tokensToSell);
+                        totalSold += _getTokenValueInUSDC(token, tokensToSell);
+                    }
+                }
+            }
         }
     }
 
@@ -524,7 +431,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     
     // Query functions
     function getFundStats() external view returns (uint256, uint256, bool) {
-        return (shareToken.totalSupply(), INITIAL_MFC_SUPPLY, isInitialized);
+        return (FundShareToken(shareToken).totalSupply(), INITIAL_MFC_SUPPLY, isInitialized);
     }
 
     function getSupportedTokens() external view returns (address[] memory) {
@@ -551,7 +458,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         require(isInitialized, "Fund not initialized");
         uint256 mfcValue = calculateMFCValue();
         require(mfcValue > 0, "Invalid MFC value");
-        mfcAmount = (_usdcAmount * 1e18) / mfcValue;
+        mfcAmount = (_usdcAmount * 10**18) / mfcValue;
     }
     
     function getRedemptionPreview(uint256 _shareAmount) external view returns (uint256 usdcAmount) {
@@ -559,27 +466,43 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         usdcAmount = _calculateRedemptionValue(_shareAmount);
     }
 
+    /**
+     * @dev Get total accumulated management fees
+     */
     function getTotalManagementFees() external view returns (uint256) {
         return totalManagementFeesCollected;
     }
     
+    /**
+     * @dev Get circulating MFC amount (excluding issuer's holdings)
+     */
     function getCirculatingSupply() external view returns (uint256) {
-        uint256 totalSupply = shareToken.totalSupply();
-        uint256 ownerBalance = shareToken.balanceOf(owner());
+        uint256 totalSupply = FundShareToken(shareToken).totalSupply();
+        uint256 ownerBalance = FundShareToken(shareToken).balanceOf(owner());
         return totalSupply - ownerBalance;
     }
 
+    /**
+     * @dev Get fund NAV information
+     */
     function getFundNAV() external view returns (uint256 nav, uint256 mfcValue, uint256 totalSupply) {
         nav = calculateNAV();
         mfcValue = calculateMFCValue();
         totalSupply = shareToken.totalSupply();
     }
     
+    /**
+     * @dev Get fund token balances
+     * @return tokens Array of token addresses (including USDC)
+     * @return balances Array of token balances
+     * @return decimals Array of token decimals
+     */
     function getFundTokenBalances() external view returns (
         address[] memory tokens,
         uint256[] memory balances,
         uint8[] memory decimals
     ) {
+        // Include USDC + supported tokens
         uint256 totalTokens = supportedTokens.length + 1;
         tokens = new address[](totalTokens);
         balances = new uint256[](totalTokens);
@@ -588,13 +511,16 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         // Add USDC first
         tokens[0] = getUSDCAddress();
         balances[0] = IERC20(getUSDCAddress()).balanceOf(address(this));
-        decimals[0] = 6;
+        decimals[0] = 6; // USDC has 6 decimals
         
         // Add supported tokens
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             tokens[i + 1] = supportedTokens[i];
             balances[i + 1] = IERC20(supportedTokens[i]).balanceOf(address(this));
-            decimals[i + 1] = _getTokenDecimals(supportedTokens[i]);
+            
+            // Get token decimals (assume 18 for most tokens, 8 for WBTC)
+            // This is a simplified approach - in production, you'd query the token contract
+            decimals[i + 1] = 18; // Default to 18 decimals
         }
     }
 }

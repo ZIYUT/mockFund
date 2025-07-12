@@ -42,13 +42,6 @@ async function main() {
         const linkAddress = await mockLINK.getAddress();
         console.log("✅ LINK deployed successfully:", linkAddress);
         
-        // Deploy UNI
-        const MockUNI = await ethers.getContractFactory("MockUNI");
-        const mockUNI = await MockUNI.deploy(deployer.address);
-        await mockUNI.waitForDeployment();
-        const uniAddress = await mockUNI.getAddress();
-        console.log("✅ UNI deployed successfully:", uniAddress);
-        
         // Deploy DAI
         const MockDAI = await ethers.getContractFactory("MockDAI");
         const mockDAI = await MockDAI.deploy(deployer.address);
@@ -60,7 +53,6 @@ async function main() {
         deployedContracts.MockWETH = wethAddress;
         deployedContracts.MockWBTC = wbtcAddress;
         deployedContracts.MockLINK = linkAddress;
-        deployedContracts.MockUNI = uniAddress;
         deployedContracts.MockDAI = daiAddress;
         
         console.log("📍 Token addresses:");
@@ -68,7 +60,6 @@ async function main() {
         console.log("   WETH:", wethAddress);
         console.log("   WBTC:", wbtcAddress);
         console.log("   LINK:", linkAddress);
-        console.log("   UNI:", uniAddress);
         console.log("   DAI:", daiAddress);
         
         // 3. Deploy PriceOracle contract
@@ -80,36 +71,36 @@ async function main() {
         deployedContracts.PriceOracle = priceOracleAddress;
         console.log("✅ PriceOracle deployed successfully:", priceOracleAddress);
         
-        // 4. Deploy MockUniswapIntegration contract
-        console.log("\n🦄 Deploying MockUniswapIntegration contract...");
-        const MockUniswapIntegration = await ethers.getContractFactory("MockUniswapIntegration");
-        const mockUniswapIntegration = await MockUniswapIntegration.deploy(
+        // 4. Deploy FixedRateUniswapIntegration contract
+        console.log("\n🦄 Deploying FixedRateUniswapIntegration contract...");
+        const FixedRateUniswapIntegration = await ethers.getContractFactory("FixedRateUniswapIntegration");
+        const fixedRateUniswapIntegration = await FixedRateUniswapIntegration.deploy(
             deployer.address,
             priceOracleAddress
         );
-        await mockUniswapIntegration.waitForDeployment();
-        const mockUniswapIntegrationAddress = await mockUniswapIntegration.getAddress();
-        deployedContracts.MockUniswapIntegration = mockUniswapIntegrationAddress;
-        console.log("✅ MockUniswapIntegration deployed successfully:", mockUniswapIntegrationAddress);
+        await fixedRateUniswapIntegration.waitForDeployment();
+        const fixedRateUniswapIntegrationAddress = await fixedRateUniswapIntegration.getAddress();
+        deployedContracts.FixedRateUniswapIntegration = fixedRateUniswapIntegrationAddress;
+        console.log("✅ FixedRateUniswapIntegration deployed successfully:", fixedRateUniswapIntegrationAddress);
         
         // 5. Deploy fund contract
         console.log("\n🏦 Deploying fund contract...");
-        const MockFund = await ethers.getContractFactory("MockFund");
-        const mockFund = await MockFund.deploy(
+        const FixedRateMockFund = await ethers.getContractFactory("FixedRateMockFund");
+        const fixedRateMockFund = await FixedRateMockFund.deploy(
             "Mock Fund Shares",  // Share token name
             "MFS",              // Share token symbol
             deployer.address,    // Initial owner
             100,                 // Management fee rate 1%
             priceOracleAddress,  // Price oracle address
-            mockUniswapIntegrationAddress // MockUniswap integration address
+            fixedRateUniswapIntegrationAddress // FixedRateUniswap integration address
         );
-        await mockFund.waitForDeployment();
-        const mockFundAddress = await mockFund.getAddress();
-        deployedContracts.MockFund = mockFundAddress;
-        console.log("✅ MockFund deployed successfully:", mockFundAddress);
+        await fixedRateMockFund.waitForDeployment();
+        const fixedRateMockFundAddress = await fixedRateMockFund.getAddress();
+        deployedContracts.FixedRateMockFund = fixedRateMockFundAddress;
+        console.log("✅ FixedRateMockFund deployed successfully:", fixedRateMockFundAddress);
         
         // Get share token address
-        const shareTokenAddress = await mockFund.shareToken();
+        const shareTokenAddress = await fixedRateMockFund.shareToken();
         deployedContracts.FundShareToken = shareTokenAddress;
         console.log("✅ FundShareToken address:", shareTokenAddress);
         
@@ -125,38 +116,64 @@ async function main() {
         ];
         
         for (const token of tokens) {
-            const tx = await mockFund.addSupportedToken(token.address, token.allocation);
+            const tx = await fixedRateMockFund.addSupportedToken(token.address, token.allocation);
             await tx.wait();
             console.log(`✅ Added ${token.name}: ${token.allocation/100}% allocation`);
         }
         
-        // 7. Set USDC token address in MockFund contract
+        // 7. Set USDC token address in FixedRateMockFund contract
         console.log("\n🔧 Setting USDC token address...");
-        const setUSDCTx = await mockFund.setUSDCToken(usdcAddress);
+        const setUSDCTx = await fixedRateMockFund.setUSDCToken(usdcAddress);
         await setUSDCTx.wait();
         console.log("✅ USDC token address set successfully:", usdcAddress);
         
-        // 8. 为MockUniswapIntegration预存代币用于交换
-        console.log("\n💰 Pre-funding MockUniswapIntegration for swaps...");
+        // 8. 为FixedRateUniswapIntegration预存代币用于交换
+        console.log("\n💰 Pre-funding FixedRateUniswapIntegration for swaps...");
         const largeAmount = ethers.parseUnits("1000000", 18); // 1M tokens
-        await mockWETH.mint(mockUniswapIntegrationAddress, largeAmount);
-        await mockWBTC.mint(mockUniswapIntegrationAddress, ethers.parseUnits("10000", 8)); // 10K WBTC
-        await mockLINK.mint(mockUniswapIntegrationAddress, largeAmount);
-        await mockDAI.mint(mockUniswapIntegrationAddress, largeAmount);
+        await mockWETH.mint(fixedRateUniswapIntegrationAddress, largeAmount);
+        await mockWBTC.mint(fixedRateUniswapIntegrationAddress, ethers.parseUnits("10000", 8)); // 10K WBTC
+        await mockLINK.mint(fixedRateUniswapIntegrationAddress, largeAmount);
+        await mockDAI.mint(fixedRateUniswapIntegrationAddress, largeAmount);
         
         // 为USDC铸造代币给Uniswap集成
         const usdcAmount = ethers.parseUnits("1000000", 6); // 1M USDC
-        await mockUSDC.mint(mockUniswapIntegrationAddress, usdcAmount);
+        await mockUSDC.mint(fixedRateUniswapIntegrationAddress, usdcAmount);
         
-        // 设置简单的交换比率（1:1）
-        await mockUniswapIntegration.setExchangeRate(usdcAddress, wethAddress, 10000); // 1:1
-        await mockUniswapIntegration.setExchangeRate(usdcAddress, wbtcAddress, 10000); // 1:1
-        await mockUniswapIntegration.setExchangeRate(usdcAddress, linkAddress, 10000); // 1:1
-        await mockUniswapIntegration.setExchangeRate(usdcAddress, daiAddress, 10000); // 1:1
+        // 初始化固定汇率
+        await fixedRateUniswapIntegration.initializeFixedRates(
+            wethAddress,
+            wbtcAddress,
+            linkAddress,
+            daiAddress
+        );
         
-        console.log("✅ MockUniswapIntegration pre-funded and configured");
+        // 为USDC设置固定汇率 (1 USDC = 1 USDC)
+        await fixedRateUniswapIntegration.setFixedRate(usdcAddress, ethers.parseUnits("1", 6));
         
-        // 9. 初始化基金
+        // 启用固定汇率模式
+        await fixedRateUniswapIntegration.setFixedRateMode(true)
+        
+        console.log("✅ FixedRateUniswapIntegration pre-funded and configured");
+        
+        // 9. Configure price oracle for tokens
+        console.log("\n🔮 Configuring price oracle for tokens...");
+        
+        // Set price feeds for tokens using Sepolia Chainlink oracles
+        const tokenMappings = [
+            { address: usdcAddress, symbol: "USDC" },
+            { address: wethAddress, symbol: "ETH" }, // Note: WETH uses ETH price feed
+            { address: wbtcAddress, symbol: "BTC" }, // Note: WBTC uses BTC price feed
+            { address: linkAddress, symbol: "LINK" },
+            { address: daiAddress, symbol: "DAI" }
+        ];
+        
+        for (const token of tokenMappings) {
+            const tx = await priceOracle.setPriceFeedBySymbol(token.address, token.symbol);
+            await tx.wait();
+            console.log(`✅ Set price feed for ${token.symbol} at address ${token.address}`);
+        }
+        
+        // 10. 初始化基金
         console.log("\n🏦 Initializing fund with 1M USDC...");
         
         // 给部署者铸造 100万 USDC
@@ -165,27 +182,27 @@ async function main() {
         console.log("✅ Minted 1M USDC to deployer");
         
         // 授权基金合约使用 USDC
-        const approveUSDCTx = await mockUSDC.approve(mockFundAddress, ethers.parseUnits("1000000", 6));
+        const approveUSDCTx = await mockUSDC.approve(fixedRateMockFundAddress, ethers.parseUnits("1000000", 6));
         await approveUSDCTx.wait();
         console.log("✅ Approved USDC for fund contract");
         
         // 初始化基金
-        const initializeTx = await mockFund.initializeFund(ethers.parseUnits("1000000", 6));
+        const initializeTx = await fixedRateMockFund.initializeFund(ethers.parseUnits("1000000", 6));
         await initializeTx.wait();
         console.log("✅ Fund initialized with 1M MFC");
         
-        // 10. 验证部署
+        // 11. 验证部署
         console.log("\n🔍 Verifying deployment results...");
-        const fundStats = await mockFund.getFundStats();
+        const fundStats = await fixedRateMockFund.getFundStats();
         console.log("📊 Fund statistics:");
         console.log("   Total supply:", ethers.formatEther(fundStats[0]));
         console.log("   Initial supply:", ethers.formatEther(fundStats[1]));
         console.log("   Is initialized:", fundStats[2]);
         
-        const supportedTokens = await mockFund.getSupportedTokens();
+        const supportedTokens = await fixedRateMockFund.getSupportedTokens();
         console.log("🎯 Number of supported investment tokens:", supportedTokens.length);
         
-        // 11. Save deployment information
+        // 12. Save deployment information
         const deploymentInfo = {
             network: await ethers.provider.getNetwork(),
             deployer: deployer.address,
@@ -208,19 +225,18 @@ async function main() {
         
         console.log("\n💾 Deployment information saved to:", deploymentFile);
         
-        // 12. Output contract addresses needed for frontend
+        // 13. Output contract addresses needed for frontend
         console.log("\n📋 Frontend configuration information:");
         console.log("```javascript");
         console.log("export const CONTRACT_ADDRESSES = {");
-        console.log(`  MOCK_FUND: "${mockFundAddress}",`);
+        console.log(`  MOCK_FUND: "${fixedRateMockFundAddress}",`);
         console.log(`  FUND_SHARE_TOKEN: "${shareTokenAddress}",`);
         console.log(`  PRICE_ORACLE: "${priceOracleAddress}",`);
-        console.log(`  MOCK_UNISWAP_INTEGRATION: "${mockUniswapIntegrationAddress}",`);
+        console.log(`  MOCK_UNISWAP_INTEGRATION: "${fixedRateUniswapIntegrationAddress}",`);
         console.log(`  MOCK_USDC: "${usdcAddress}",`);
         console.log(`  MOCK_WETH: "${wethAddress}",`);
         console.log(`  MOCK_WBTC: "${wbtcAddress}",`);
         console.log(`  MOCK_LINK: "${linkAddress}",`);
-        console.log(`  MOCK_UNI: "${uniAddress}",`);
         console.log(`  MOCK_DAI: "${daiAddress}"`);
         console.log("};");
         console.log(`export const NETWORK_ID = ${(await ethers.provider.getNetwork()).chainId};`);

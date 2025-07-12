@@ -107,12 +107,14 @@ async function main() {
         await mockFund.waitForDeployment();
         console.log(`✅ MockFund部署成功: ${await mockFund.getAddress()}`);
         
-        // 6. 设置支持的代币
-        console.log("\n⚙️ 设置支持的代币...");
+        // 6. 设置支持的代币和权重 (总权重应为10000 = 100%)
+        // 配置：50% USDC保留不动，剩余50%分配给4种代币，每种12.5%
+        console.log("\n⚙️ 设置支持的代币和权重...");
         await mockFund.addSupportedToken(wethAddress, 1250); // 12.5%
         await mockFund.addSupportedToken(wbtcAddress, 1250); // 12.5%
         await mockFund.addSupportedToken(linkAddress, 1250); // 12.5%
         await mockFund.addSupportedToken(daiAddress, 1250); // 12.5%
+        // 注意：剩余50%的USDC将保留在基金中不进行投资
         console.log("✅ 支持的代币设置完成");
         
         // 7. 设置USDC地址
@@ -187,6 +189,15 @@ async function main() {
         console.log(`部署者持有: ${ethers.formatEther(deployerShares)} MFC`);
         console.log(`基金NAV: ${ethers.formatUnits(nav, 6)} USDC`);
         console.log(`单个MFC价值: ${ethers.formatUnits(mfcValue, 6)} USDC`);
+        
+        // 显示管理费信息
+        const managementFeeRate = await mockFund.managementFeeRate();
+        const totalManagementFeesCollected = await mockFund.totalManagementFeesCollected();
+        const lastFeeCollection = await mockFund.lastFeeCollection();
+        console.log(`\n💰 管理费信息:`);
+        console.log(`管理费率: ${Number(managementFeeRate) / 100}% (${managementFeeRate} basis points)`);
+        console.log(`累计管理费: ${ethers.formatUnits(totalManagementFeesCollected, 6)} USDC`);
+        console.log(`上次收费时间: ${new Date(Number(lastFeeCollection) * 1000).toLocaleString()}`);
         
         // 显示MFC组成
         console.log(`\n📊 MFC组成详情:`);
@@ -276,6 +287,13 @@ async function main() {
         console.log(`新基金NAV: ${ethers.formatUnits(newNav, 6)} USDC`);
         console.log(`新单个MFC价值: ${ethers.formatUnits(newMfcValue, 6)} USDC`);
         
+        // 显示投资后的管理费信息
+        const totalFeesAfterInvest = await mockFund.totalManagementFeesCollected();
+        const lastFeeAfterInvest = await mockFund.lastFeeCollection();
+        console.log(`\n💰 投资后管理费信息:`);
+        console.log(`累计管理费: ${ethers.formatUnits(totalFeesAfterInvest, 6)} USDC`);
+        console.log(`上次收费时间: ${new Date(Number(lastFeeAfterInvest) * 1000).toLocaleString()}`);
+        
         // 18. 测试赎回功能
         console.log("\n🔄 测试赎回功能...");
         
@@ -287,12 +305,32 @@ async function main() {
         console.log(`赎回前 - 投资者1 MFC余额: ${ethers.formatEther(await shareToken.balanceOf(investor1.address))}`);
         console.log(`准备赎回: ${ethers.formatEther(redeemAmount1)} MFC`);
         
+        // 计算预期赎回价值和手续费
+        const currentMFCValue = await mockFund.calculateMFCValue();
+        const redeemValue = (redeemAmount1 * currentMFCValue) / ethers.parseEther("1");
+        const redemptionFee = (redeemValue * managementFeeRate) / 10000n;
+        const netRedeemValue = redeemValue - redemptionFee;
+        
+        console.log(`预期赎回总价值: ${ethers.formatUnits(redeemValue, 6)} USDC`);
+        console.log(`预期赎回手续费 (1%): ${ethers.formatUnits(redemptionFee, 6)} USDC`);
+        console.log(`预期净赎回金额: ${ethers.formatUnits(netRedeemValue, 6)} USDC`);
+        
+        // 记录赎回前的管理费
+        const feesBeforeRedeem = await mockFund.totalManagementFeesCollected();
+        
         // 需要先批准合约转移MFC
         await shareToken.connect(investor1).approve(await mockFund.getAddress(), redeemAmount1);
         await mockFund.connect(investor1).redeem(redeemAmount1);
         
         console.log(`赎回后 - 投资者1 USDC余额: ${ethers.formatUnits(await usdc.balanceOf(investor1.address), 6)}`);
         console.log(`赎回后 - 投资者1 MFC余额: ${ethers.formatEther(await shareToken.balanceOf(investor1.address))}`);
+        
+        // 显示赎回后的管理费变化
+        const feesAfterRedeem = await mockFund.totalManagementFeesCollected();
+        const actualRedemptionFee = feesAfterRedeem - feesBeforeRedeem;
+        console.log(`\n💰 赎回手续费信息:`);
+        console.log(`实际收取的赎回手续费: ${ethers.formatUnits(actualRedemptionFee, 6)} USDC`);
+        console.log(`累计管理费 (含赎回费): ${ethers.formatUnits(feesAfterRedeem, 6)} USDC`);
         
         // 19. 检查最终基金状态
         console.log("\n📊 检查最终基金状态...");
@@ -304,7 +342,35 @@ async function main() {
         console.log(`最终基金NAV: ${ethers.formatUnits(finalNav, 6)} USDC`);
         console.log(`最终单个MFC价值: ${ethers.formatUnits(finalMfcValue, 6)} USDC`);
         
-        // 20. 保存部署信息
+        // 显示最终管理费统计
+        const finalTotalFees = await mockFund.totalManagementFeesCollected();
+        const finalLastFeeCollection = await mockFund.lastFeeCollection();
+        const withdrawableManagementFees = await mockFund.getWithdrawableManagementFees();
+        console.log(`\n💰 最终管理费统计:`);
+        console.log(`总累计管理费: ${ethers.formatUnits(finalTotalFees, 6)} USDC`);
+        console.log(`可提取管理费余额: ${ethers.formatUnits(withdrawableManagementFees, 6)} USDC`);
+        console.log(`管理费占初始NAV比例: ${(parseFloat(ethers.formatUnits(finalTotalFees, 6)) / parseFloat(ethers.formatUnits(nav, 6)) * 100).toFixed(4)}%`);
+        console.log(`最后收费时间: ${new Date(Number(finalLastFeeCollection) * 1000).toLocaleString()}`);
+        
+        // 20. 测试管理费提取功能
+        console.log(`\n🏦 测试管理费提取功能...`);
+        
+        if (withdrawableManagementFees > 0) {
+            console.log(`提取前 - 部署者USDC余额: ${ethers.formatUnits(await usdc.balanceOf(deployer.address), 6)}`);
+            console.log(`提取前 - 可提取管理费: ${ethers.formatUnits(withdrawableManagementFees, 6)} USDC`);
+            
+            // 执行管理费提取
+            await mockFund.withdrawAllManagementFees();
+            
+            console.log(`提取后 - 部署者USDC余额: ${ethers.formatUnits(await usdc.balanceOf(deployer.address), 6)}`);
+            console.log(`提取后 - 可提取管理费: ${ethers.formatUnits(await mockFund.getWithdrawableManagementFees(), 6)} USDC`);
+            
+            console.log(`✅ 管理费提取成功！`);
+        } else {
+            console.log(`⚠️ 当前没有可提取的管理费`);
+        }
+        
+        // 21. 保存部署信息
         const deploymentInfo = {
             network: {
                 name: network.name,
@@ -337,7 +403,15 @@ async function main() {
                 finalNAV: ethers.formatUnits(finalNav, 6),
                 investor1Investment: ethers.formatUnits(investAmount1, 6),
                 investor2Investment: ethers.formatUnits(investAmount2, 6),
-                investor1Redemption: ethers.formatEther(redeemAmount1)
+                investor1Redemption: ethers.formatEther(redeemAmount1),
+                managementFees: {
+                    feeRate: managementFeeRate.toString(),
+                    totalFeesCollected: ethers.formatUnits(finalTotalFees, 6),
+                    withdrawableManagementFees: ethers.formatUnits(withdrawableManagementFees, 6),
+                    feePercentageOfInitialNAV: (parseFloat(ethers.formatUnits(finalTotalFees, 6)) / parseFloat(ethers.formatUnits(nav, 6)) * 100).toFixed(4),
+                    lastFeeCollectionTime: new Date(Number(finalLastFeeCollection) * 1000).toISOString(),
+                    managementFeeWithdrawn: withdrawableManagementFees > 0
+                }
             }
         };
         

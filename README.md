@@ -4,46 +4,66 @@
 
 ## 🚀 快速开始
 
-### 部署到 Sepolia 测试网
+### 部署到 Sepolia 测试网 (推荐)
 
-1. **配置环境变量**
+**Windows 用户 - 一键部署:**
+```bash
+# 双击运行批处理文件
+deploy-sepolia.bat
+```
+
+**手动部署:**
+
+1. **环境准备**
    ```bash
-   # 在 back-end 目录下创建 .env 文件
-   SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
-   PRIVATE_KEY=your_private_key_here
-   ETHERSCAN_API_KEY=your_etherscan_api_key_here
+   cd back-end
+   cp .env.example .env
+   # 编辑 .env 文件，填入:
+   # SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+   # PRIVATE_KEY=0xyour_private_key_here
    ```
 
-2. **一键部署**
-```bash
-   # 使用部署脚本
-   chmod +x deploy-to-sepolia.sh
-   ./deploy-to-sepolia.sh
-   
-   # 或者手动部署
-cd back-end
-npm install
-   npx hardhat run scripts/deploy-sepolia.js --network sepolia
-```
+2. **获取测试资源**
+   - Sepolia ETH: [Sepolia Faucet](https://sepoliafaucet.com/)
+   - 测试代币: [Chainlink Faucet](https://faucets.chain.link/sepolia)
 
-3. **同步前端地址**
-```bash
-   cd new-frontend
-npm install
+3. **部署和测试**
+   ```bash
+   npm install
+   npm run compile
+   npm run deploy:sepolia    # 部署合约
+   npm run test:sepolia      # 运行测试
+   ```
+
+4. **启动前端**
+   ```bash
+   cd ../new-frontend
+   npm install
    npm run sync-addresses
-```
-
-4. **启动前端应用**
-```bash
-npm run dev
-```
+   npm run dev
+   ```
 
 访问 `http://localhost:3000` 开始使用！
+
+### 本地开发
+
+```bash
+# 启动本地节点
+cd back-end
+npm run node
+
+# 部署到本地 (新终端)
+npm run test:local
+
+# 启动前端
+cd ../new-frontend
+npm run dev
+```
 
 ## 📋 功能特性
 
 ### 基金特性
-- **多资产投资组合**: 50% USDC + 50% 主流代币 (WBTC, WETH, LINK, DAI)
+- **多资产投资组合**: 50% USDC (保留) + 50% 主流代币 (WBTC 12.5%, WETH 12.5%, LINK 12.5%, DAI 12.5%)
 - **份额代币**: 投资获得 MFC 份额代币，1:1 比例
 - **灵活赎回**: 随时赎回 MFC 获得 USDC
 - **自动管理费**: 每分钟 1% 管理费，仅对流通份额收取
@@ -103,7 +123,13 @@ npx hardhat run scripts/test-sepolia-deployment.js --network sepolia
 
 ## 📚 文档
 
-- [部署指南](DEPLOYMENT_GUIDE.md) - 详细的 Sepolia 部署说明
+### Sepolia 测试网
+- [Sepolia 快速开始](back-end/SEPOLIA_QUICKSTART.md) - 快速部署指南
+- [Sepolia 详细指南](back-end/SEPOLIA_DEPLOYMENT_GUIDE.md) - 完整部署说明
+- [一键部署脚本](deploy-sepolia.bat) - Windows 批处理脚本
+
+### 开发文档
+- [部署指南](DEPLOYMENT_GUIDE.md) - 通用部署说明
 - [后端文档](back-end/README.md) - 智能合约详细文档
 - [故障排除](new-frontend/TROUBLESHOOTING.md) - 常见问题解决方案
 

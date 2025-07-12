@@ -6,9 +6,11 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "deploy:sepolia": "hardhat run scripts/deploy-complete.js --network sepolia",
+    "deploy:sepolia": "hardhat run scripts/deploy-sepolia.js --network sepolia",
+    "test:sepolia": "hardhat run scripts/test-mockfund-sepolia.js --network sepolia",
     "deploy:sepolia-chainlink": "hardhat run scripts/deploy-sepolia-chainlink.js --network sepolia",
     "deploy:local": "hardhat run scripts/deploy-complete.js --network localhost",
+    "test:local": "hardhat run scripts/test-mockfund-localhost.js --network localhost",
     "verify:sepolia": "hardhat run scripts/verify.js --network sepolia",
     "mint-tokens": "hardhat run scripts/mint-test-tokens.js --network sepolia",
     "debug-investment": "hardhat run scripts/debug-investment.js --network sepolia",

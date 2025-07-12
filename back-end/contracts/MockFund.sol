@@ -40,12 +40,15 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
     uint256 public managementFeeRate = 100; // 1%
     uint256 public lastFeeCollection;
     uint256 public totalManagementFeesCollected;
+    uint256 public managementFeeUSDCBalance; // 可提取的管理费USDC余额
 
     // Events
     event FundInitialized(uint256 initialSupply, uint256 initialUSDC);
     event Investment(address indexed investor, uint256 usdcAmount, uint256 mfcAmount);
     event Redemption(address indexed investor, uint256 shareAmount, uint256 usdcAmount);
     event ManagementFeeCollected(uint256 feeAmount, uint256 timestamp, uint256 totalFees);
+    event ManagementFeeWithdrawn(uint256 amount, address to);
+    event ManagementFeeUSDCCollected(uint256 usdcAmount, uint256 timestamp);
     event SupportedTokenAdded(address token, uint256 allocation);
     event TokenCompositionSet(address token, uint256 amountPerMFC);
 
@@ -342,7 +345,8 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         // Transfer USDC to user
         IERC20(getUSDCAddress()).safeTransfer(msg.sender, netAmount);
         
-        // Accumulate management fee
+        // 将赎回手续费累加到管理费USDC余额
+        managementFeeUSDCBalance += redemptionFee;
         totalManagementFeesCollected += redemptionFee;
         
         emit Redemption(msg.sender, _shareAmount, netAmount);
@@ -500,15 +504,80 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
             return;
         }
         
-        // Calculate management fee (1%)
-        uint256 feeAmount = (circulatingSupply * managementFeeRate) / BASIS_POINTS;
+        // Calculate management fee value in USDC
+        uint256 mfcValue = calculateMFCValue();
+        uint256 feeAmountMFC = (circulatingSupply * managementFeeRate) / BASIS_POINTS;
+        uint256 feeAmountUSDC = (feeAmountMFC * mfcValue) / 1e18;
         
-        if (feeAmount > 0) {
-            totalManagementFeesCollected += feeAmount;
+        if (feeAmountUSDC > 0) {
+            // 实际分离USDC到管理费余额
+            uint256 usdcBalance = IERC20(getUSDCAddress()).balanceOf(address(this));
+            if (usdcBalance >= feeAmountUSDC) {
+                managementFeeUSDCBalance += feeAmountUSDC;
+            } else {
+                // 如果USDC不足，卖出部分代币获取USDC
+                _sellTokensForManagementFee(feeAmountUSDC - usdcBalance);
+                managementFeeUSDCBalance += feeAmountUSDC;
+            }
+            
+            totalManagementFeesCollected += feeAmountUSDC;
             lastFeeCollection = block.timestamp;
             
-            emit ManagementFeeCollected(feeAmount, block.timestamp, totalManagementFeesCollected);
+            emit ManagementFeeCollected(feeAmountUSDC, block.timestamp, totalManagementFeesCollected);
+            emit ManagementFeeUSDCCollected(feeAmountUSDC, block.timestamp);
         }
+    }
+
+    /**
+     * @dev 卖出代币获取USDC用于管理费
+     * @param _usdcNeeded 需要的USDC数量
+     */
+    function _sellTokensForManagementFee(uint256 _usdcNeeded) internal {
+        uint256 usdcObtained = 0;
+        
+        for (uint256 i = 0; i < supportedTokens.length && usdcObtained < _usdcNeeded; i++) {
+            address token = supportedTokens[i];
+            uint256 tokenBalance = IERC20(token).balanceOf(address(this));
+            
+            if (tokenBalance > 0) {
+                // 计算需要卖出的代币数量
+                uint256 tokenValue = _getTokenValueInUSDC(token, tokenBalance);
+                uint256 remainingNeeded = _usdcNeeded - usdcObtained;
+                
+                if (tokenValue > remainingNeeded) {
+                    // 只卖出部分代币
+                    uint256 tokenToSell = (tokenBalance * remainingNeeded) / tokenValue;
+                    _swapTokenForUSDC(token, tokenToSell);
+                    usdcObtained += remainingNeeded;
+                } else {
+                    // 卖出全部代币
+                    _swapTokenForUSDC(token, tokenBalance);
+                    usdcObtained += tokenValue;
+                }
+            }
+        }
+    }
+    
+    /**
+     * @dev 一键提取所有管理费到部署者地址
+     */
+    function withdrawAllManagementFees() external onlyOwner {
+        require(managementFeeUSDCBalance > 0, "No management fees to withdraw");
+        
+        uint256 withdrawAmount = managementFeeUSDCBalance;
+        managementFeeUSDCBalance = 0;
+        
+        // 转账USDC到部署者地址
+        IERC20(getUSDCAddress()).safeTransfer(owner(), withdrawAmount);
+        
+        emit ManagementFeeWithdrawn(withdrawAmount, owner());
+    }
+    
+    /**
+     * @dev 查询可提取的管理费余额
+     */
+    function getWithdrawableManagementFees() external view returns (uint256) {
+        return managementFeeUSDCBalance;
     }
 
     // Management functions

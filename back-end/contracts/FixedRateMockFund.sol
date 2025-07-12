@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -89,8 +90,8 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         require(_initialUSDCAmount == INITIAL_USDC_AMOUNT, "Initial amount must be 1M USDC");
         require(supportedTokens.length == 4, "Must have exactly 4 supported tokens");
         
-        // Enable fixed rate mode for initialization
-        uniswapIntegration.setFixedRateMode(true);
+        // Note: Fixed rate mode should be enabled before calling this function
+        // We don't call setFixedRateMode here to avoid ownership issues
         
         // Transfer initial USDC
         IERC20(getUSDCAddress()).safeTransferFrom(msg.sender, address(this), _initialUSDCAmount);
@@ -110,7 +111,17 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
             // Calculate exact token amount per MFC
             // tokenAmount has token's native decimals
             // INITIAL_MFC_SUPPLY has 18 decimals
-            mfcTokenRatio[token] = (tokenAmount * 1e18) / INITIAL_MFC_SUPPLY;
+            // Scale tokenAmount to 18 decimals for consistent storage
+            uint8 tokenDecimals = _getTokenDecimals(token);
+            uint256 scaledTokenAmount;
+            if (tokenDecimals <= 18) {
+                scaledTokenAmount = tokenAmount * (10 ** (18 - tokenDecimals));
+            } else {
+                scaledTokenAmount = tokenAmount / (10 ** (tokenDecimals - 18));
+            }
+            // To avoid precision loss, multiply by 1e18 before dividing
+            // This gives us the ratio with 18 decimal places of precision
+            mfcTokenRatio[token] = (scaledTokenAmount * 1e18) / INITIAL_MFC_SUPPLY;
             
             emit TokenCompositionSet(token, mfcTokenRatio[token]);
         }
@@ -119,8 +130,8 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         // usdcToKeep has 6 decimals, INITIAL_MFC_SUPPLY has 18 decimals
         mfcUSDCAmount = (usdcToKeep * 1e18) / INITIAL_MFC_SUPPLY;
         
-        // Disable fixed rate mode after initialization
-        uniswapIntegration.setFixedRateMode(false);
+        // Note: Fixed rate mode should be disabled after initialization by the deployer
+        // We don't call setFixedRateMode here to avoid ownership issues
         
         // Mint initial MFC to deployer
         shareToken.mint(msg.sender, INITIAL_MFC_SUPPLY);
@@ -146,14 +157,16 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         require(fixedRate > 0, "Fixed rate not set for token");
         
         // Calculate token amount based on fixed rate
-        // For example: 125,000 USDC / 15 USDC per LINK = 8,333.333... LINK
+        // For example: 125,000 USDC (125000 * 1e6) / 115,000 USDC per WBTC (115000 * 1e6) = 1.087 WBTC
         // fixedRate is scaled by 1e6, _usdcAmount is scaled by 1e6
         // Result should be in token's native decimals
         
-        // Get token decimals (assume standard decimals)
+        // Get token decimals
         uint8 tokenDecimals = _getTokenDecimals(_token);
         
-        // Calculate: (_usdcAmount * 10^tokenDecimals) / fixedRate
+        // Simple calculation: tokenAmount = _usdcAmount / fixedRate * 10^tokenDecimals
+        // _usdcAmount is scaled by 1e6, fixedRate is scaled by 1e6
+        // So: tokenAmount = (_usdcAmount * 10^tokenDecimals) / fixedRate
         tokenAmount = (_usdcAmount * (10 ** tokenDecimals)) / fixedRate;
         
         // Approve and execute swap
@@ -176,11 +189,15 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
      * @param _token Token address
      * @return decimals Token decimals
      */
-    function _getTokenDecimals(address _token) internal pure returns (uint8 decimals) {
+    function _getTokenDecimals(address _token) internal view returns (uint8 decimals) {
         // For known tokens, return specific decimals
         // In production, you would query the token contract
-        // For now, assume 18 decimals for most tokens, 8 for WBTC
-        return 18; // Default to 18 decimals
+        try IERC20Metadata(_token).decimals() returns (uint8 tokenDecimals) {
+            return tokenDecimals;
+        } catch {
+            // Fallback to 18 decimals if query fails
+            return 18;
+        }
     }
 
     /**
@@ -235,8 +252,14 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
             address token = supportedTokens[i];
             uint256 tokenAmountPerMFC = mfcTokenRatio[token]; // This is scaled by 1e18
             
-            // Convert to actual token amount (remove 1e18 scaling)
-            uint256 actualTokenAmount = tokenAmountPerMFC / 1e18;
+            // Convert to actual token amount (convert back to token's native decimals)
+            uint8 tokenDecimals = _getTokenDecimals(token);
+            uint256 actualTokenAmount;
+            if (tokenDecimals <= 18) {
+                actualTokenAmount = tokenAmountPerMFC / (10 ** (18 - tokenDecimals)) / 1e18;
+            } else {
+                actualTokenAmount = tokenAmountPerMFC * (10 ** (tokenDecimals - 18)) / 1e18;
+            }
             
             if (actualTokenAmount > 0) {
                 uint256 tokenValue = _getTokenValueInUSDC(token, actualTokenAmount);
@@ -358,9 +381,19 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         uint256 tokenPart = 0;
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
-            uint256 tokenAmount = (_shareAmount * mfcTokenRatio[token]) / 1e18;
-            if (tokenAmount > 0) {
-                tokenPart += _getTokenValueInUSDC(token, tokenAmount);
+            uint256 tokenAmountPerMFC = (_shareAmount * mfcTokenRatio[token]) / 1e18;
+            
+            // Convert to actual token amount (convert back to token's native decimals)
+            uint8 tokenDecimals = _getTokenDecimals(token);
+            uint256 actualTokenAmount;
+            if (tokenDecimals <= 18) {
+                actualTokenAmount = tokenAmountPerMFC / (10 ** (18 - tokenDecimals));
+            } else {
+                actualTokenAmount = tokenAmountPerMFC * (10 ** (tokenDecimals - 18)) / 1e18;
+            }
+            
+            if (actualTokenAmount > 0) {
+                tokenPart += _getTokenValueInUSDC(token, actualTokenAmount);
             }
         }
         
@@ -374,12 +407,21 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
     function _redeemTokensForUSDC(uint256 _shareAmount) internal {
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             address token = supportedTokens[i];
-            uint256 tokenAmount = (_shareAmount * mfcTokenRatio[token]) / 1e18;
+            uint256 tokenAmountPerMFC = (_shareAmount * mfcTokenRatio[token]) / 1e18;
             
-            if (tokenAmount > 0) {
+            // Convert to actual token amount (convert back to token's native decimals)
+            uint8 tokenDecimals = _getTokenDecimals(token);
+            uint256 actualTokenAmount;
+            if (tokenDecimals <= 18) {
+                actualTokenAmount = tokenAmountPerMFC / (10 ** (18 - tokenDecimals));
+            } else {
+                actualTokenAmount = tokenAmountPerMFC * (10 ** (tokenDecimals - 18)) / 1e18;
+            }
+            
+            if (actualTokenAmount > 0) {
                 uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-                if (tokenBalance >= tokenAmount) {
-                    _swapTokenForUSDC(token, tokenAmount);
+                if (tokenBalance >= actualTokenAmount) {
+                    _swapTokenForUSDC(token, actualTokenAmount);
                 }
             }
         }
@@ -552,7 +594,7 @@ contract FixedRateMockFund is Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < supportedTokens.length; i++) {
             tokens[i + 1] = supportedTokens[i];
             balances[i + 1] = IERC20(supportedTokens[i]).balanceOf(address(this));
-            decimals[i + 1] = 18;
+            decimals[i + 1] = _getTokenDecimals(supportedTokens[i]);
         }
     }
 }

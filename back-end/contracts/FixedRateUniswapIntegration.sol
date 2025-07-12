@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./ChainlinkPriceOracle.sol";
 
@@ -22,6 +23,9 @@ contract FixedRateUniswapIntegration is Ownable, ReentrancyGuard {
     
     // Mode control
     bool public useFixedRates = false;
+    
+    // Authorized callers for minting
+    mapping(address => bool) public authorizedCallers;
     
     // Predefined fixed rates (USDC per token)
     uint256 public constant USDC_PER_ETH = 3000 * 1e6;   // 3000 USDC per ETH
@@ -134,6 +138,15 @@ contract FixedRateUniswapIntegration is Ownable, ReentrancyGuard {
     }
     
     /**
+     * @dev Authorize a caller for minting
+     * @param _caller Caller address
+     * @param _authorized Whether to authorize
+     */
+    function setAuthorizedCaller(address _caller, bool _authorized) external onlyOwner {
+        authorizedCallers[_caller] = _authorized;
+    }
+    
+    /**
      * @dev Get exchange rate between two tokens
      * @param _tokenIn Input token address
      * @param _tokenOut Output token address
@@ -155,8 +168,23 @@ contract FixedRateUniswapIntegration is Ownable, ReentrancyGuard {
             require(rateIn > 0 && rateOut > 0, "Fixed rates not set");
             
             // Calculate rate: tokenIn -> tokenOut
-            // If tokenIn costs more USDC, you get less tokenOut
-            rate = (rateIn * 1e18) / rateOut; // Scale to 18 decimals
+            // For USDC -> Token: rate = 1 / tokenPrice (how many tokens per USDC)
+            // For Token -> USDC: rate = tokenPrice (how much USDC per token)
+            // Both rates are scaled by 1e6, so we need to adjust for 18 decimal precision
+            
+            // Get token decimals for proper scaling
+            uint8 tokenInDecimals = _getTokenDecimals(_tokenIn);
+            uint8 tokenOutDecimals = _getTokenDecimals(_tokenOut);
+            
+            // Calculate base rate: rateOut / rateIn (output token price / input token price)
+            rate = (rateIn * 1e18) / rateOut;
+            
+            // Adjust for decimal differences
+            if (tokenOutDecimals > tokenInDecimals) {
+                rate = rate * (10 ** (tokenOutDecimals - tokenInDecimals));
+            } else if (tokenInDecimals > tokenOutDecimals) {
+                rate = rate / (10 ** (tokenInDecimals - tokenOutDecimals));
+            }
         } else {
             // Use Chainlink real prices
             try priceOracle.getLatestPrice(_tokenIn) returns (int256 priceIn, uint256) {
@@ -312,7 +340,13 @@ contract FixedRateUniswapIntegration is Ownable, ReentrancyGuard {
         address _recipient,
         uint256 _amount
     ) external {
-        require(msg.sender == address(this), "Only self call allowed");
+        // Allow calls from this contract, the owner, or authorized callers
+        require(
+            msg.sender == address(this) || 
+            msg.sender == owner() || 
+            authorizedCallers[msg.sender], 
+            "Unauthorized call"
+        );
         
         // Try calling mint function
         (bool success, ) = _token.call(
@@ -328,6 +362,20 @@ contract FixedRateUniswapIntegration is Ownable, ReentrancyGuard {
      */
     function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(owner(), _amount);
+    }
+    
+    /**
+     * @dev Get token decimals
+     * @param _token Token address
+     * @return decimals Token decimals
+     */
+    function _getTokenDecimals(address _token) internal view returns (uint8 decimals) {
+        try IERC20Metadata(_token).decimals() returns (uint8 tokenDecimals) {
+            return tokenDecimals;
+        } catch {
+            // Fallback to 18 decimals if query fails
+            return 18;
+        }
     }
     
     /**

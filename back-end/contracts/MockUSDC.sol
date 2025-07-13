@@ -2,9 +2,10 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MockUSDC is ERC20, Ownable {
+contract MockUSDC is ERC20, ERC20Permit, Ownable {
     
     // Events
     event TokensMinted(address indexed to, uint256 amount);
@@ -13,6 +14,7 @@ contract MockUSDC is ERC20, Ownable {
 
     constructor(address _initialOwner) 
         ERC20("Mock USD Coin", "USDC") 
+        ERC20Permit("Mock USD Coin")
         Ownable(_initialOwner) 
     {
         require(_initialOwner != address(0), "Invalid owner address");

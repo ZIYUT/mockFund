@@ -5,13 +5,14 @@ import { useAccount } from 'wagmi';
 import WalletConnect from '@/components/WalletConnect';
 import FundInvestment from '@/components/FundInvestment';
 import FundRedemption from '@/components/FundRedemption';
+import FundPortfolio from '@/components/FundPortfolio';
 import DebugInfo from '@/components/DebugInfo';
 import GetTestTokens from '@/components/GetTestTokens';
-import { useMockFund } from '@/hooks/useMockFund';
+import { useFundData } from '@/hooks/useFundData';
 
 export default function Home() {
   const { isConnected } = useAccount();
-  const { isInitialized, nav, mfcValue } = useMockFund();
+  const { isInitialized, mfcData, tokenPrices, fundPortfolio } = useFundData();
   const [activeTab, setActiveTab] = useState<'investment' | 'redemption'>('investment');
 
   return (
@@ -27,21 +28,21 @@ export default function Home() {
         <DebugInfo />
         
         {/* 基金概览 */}
-        {isInitialized && (
+        {isInitialized && mfcData && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 className="text-2xl font-bold mb-4">基金概览</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-blue-800">基金净值</h3>
-                <p className="text-2xl font-bold text-blue-600">${parseFloat(nav).toLocaleString()}</p>
+                <p className="text-2xl font-bold text-blue-600">${parseFloat(mfcData.nav).toLocaleString()}</p>
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-green-800">MFC价值</h3>
-                <p className="text-2xl font-bold text-green-600">${parseFloat(mfcValue).toFixed(4)}</p>
+                <p className="text-2xl font-bold text-green-600">${parseFloat(mfcData.mfcValue).toFixed(4)}</p>
               </div>
               <div className="bg-purple-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-purple-800">投资组合</h3>
-                <p className="text-2xl font-bold text-purple-600">50% USDC + 50% 代币</p>
+                <h3 className="font-semibold text-purple-800">投资进度</h3>
+                <p className="text-2xl font-bold text-purple-600">{mfcData.progressPercentage.toFixed(1)}%</p>
               </div>
               <div className="bg-orange-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-orange-800">管理费率</h3>
@@ -52,10 +53,11 @@ export default function Home() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* 左侧：钱包连接和获取测试代币 */}
+          {/* 左侧：钱包连接、获取测试代币和投资组合 */}
           <div className="lg:col-span-1 space-y-6">
             <WalletConnect />
             <GetTestTokens />
+            {isInitialized && <FundPortfolio />}
           </div>
 
           {/* 右侧：投资/赎回功能 */}
@@ -117,10 +119,10 @@ export default function Home() {
 
         {/* 底部信息 */}
         <div className="mt-12 text-center text-sm text-gray-500">
-          <p>合约地址: MockFund - 0x92053436b6D0758EcFb765C86a71b2dC4228DEa0</p>
+          <p>合约地址: MockFund - 0x9fFB513271065CFfE4Fda7DA3E610Df629101F27</p>
           <p className="mt-2">
             <a 
-              href="https://sepolia.etherscan.io/address/0x92053436b6D0758EcFb765C86a71b2dC4228DEa0" 
+              href="https://sepolia.etherscan.io/address/0x9fFB513271065CFfE4Fda7DA3E610Df629101F27" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline"

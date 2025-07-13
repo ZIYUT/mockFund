@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -276,6 +277,66 @@ contract MockFund is Ownable, Pausable, ReentrancyGuard {
         }
         
         theoreticalValue = usdcPortion + tokenPortion;
+    }
+
+    /**
+     * @dev Invest USDC to get MFC using permit (combines approve and invest)
+     * @param _usdcAmount Amount of USDC to invest
+     * @param _deadline Permit deadline
+     * @param _v Permit signature v
+     * @param _r Permit signature r
+     * @param _s Permit signature s
+     */
+    function investWithPermit(
+        uint256 _usdcAmount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external nonReentrant whenNotPaused {
+        require(isInitialized, "Fund not initialized");
+        require(_usdcAmount >= minimumInvestment, "Investment below minimum");
+        
+        // Use permit to approve USDC spending
+        IERC20Permit(getUSDCAddress()).permit(
+            msg.sender,
+            address(this),
+            _usdcAmount,
+            _deadline,
+            _v,
+            _r,
+            _s
+        );
+        
+        // Collect management fee
+        _collectManagementFee();
+        
+        // Calculate MFC amount to receive (based on current NAV)
+        uint256 mfcValue = calculateMFCValue();
+        require(mfcValue > 0, "Invalid MFC value");
+        
+        uint256 mfcToTransfer = (_usdcAmount * 1e18) / mfcValue;
+        require(mfcToTransfer > 0, "Invalid MFC amount");
+        
+        // Check if contract has enough MFC to sell
+        require(shareToken.balanceOf(address(this)) >= mfcToTransfer, "Insufficient MFC in contract");
+        
+        // Transfer USDC to contract
+        IERC20(getUSDCAddress()).safeTransferFrom(msg.sender, address(this), _usdcAmount);
+        
+        // Purchase tokens according to fixed ratio
+        uint256 tokenPurchaseAmount = (_usdcAmount * TOKEN_ALLOCATION) / BASIS_POINTS;
+        uint256 perTokenAmount = tokenPurchaseAmount / 4;
+        
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
+            address token = supportedTokens[i];
+            _purchaseTokenWithUSDC(token, perTokenAmount);
+        }
+        
+        // Transfer MFC from contract to investor
+        shareToken.transfer(msg.sender, mfcToTransfer);
+        
+        emit Investment(msg.sender, _usdcAmount, mfcToTransfer);
     }
 
     /**

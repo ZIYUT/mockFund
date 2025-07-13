@@ -4,7 +4,7 @@ const path = require("path");
 
 // 从部署文件加载合约地址
 function loadDeploymentInfo() {
-    const deploymentPath = path.join(__dirname, "..", "sepolia-deployment.json");
+    const deploymentPath = path.join(__dirname, "..", "deployments", "sepolia-deployment.json");
     if (!fs.existsSync(deploymentPath)) {
         throw new Error(`部署文件不存在: ${deploymentPath}\n请先运行 deploy-sepolia.js 脚本`);
     }
@@ -47,7 +47,7 @@ async function main() {
         const mockFund = await ethers.getContractAt("contracts/MockFund.sol:MockFund", deploymentInfo.contracts.MockFund);
         const chainlinkOracle = await ethers.getContractAt("ChainlinkPriceOracle", deploymentInfo.contracts.ChainlinkPriceOracle);
         const shareToken = await ethers.getContractAt("FundShareToken", deploymentInfo.contracts.FundShareToken);
-        const uniswapIntegration = await ethers.getContractAt("UniswapIntegration", deploymentInfo.contracts.UniswapIntegration);
+        const uniswapIntegration = await ethers.getContractAt("contracts/UniswapIntegration.sol:UniswapIntegration", deploymentInfo.contracts.UniswapIntegration);
         
         console.log(`✅ MockFund: ${await mockFund.getAddress()}`);
         console.log(`✅ ChainlinkPriceOracle: ${await chainlinkOracle.getAddress()}`);
@@ -116,7 +116,7 @@ async function main() {
             console.log("\n⚠️ 基金尚未初始化");
             
             // 检查是否有足够的USDC进行初始化
-            const minInitAmount = ethers.parseUnits("1000", 6); // 最少1000 USDC
+            const minInitAmount = ethers.parseUnits("1000000", 6); // 最少1,000,000 USDC
             if (deployerUSDCBalance < minInitAmount) {
                 console.log(`❌ USDC余额不足，需要至少 ${ethers.formatUnits(minInitAmount, 6)} USDC 进行初始化`);
                 console.log("请从水龙头获取测试USDC: https://faucets.chain.link/sepolia");
@@ -125,7 +125,7 @@ async function main() {
             
             // 初始化基金
             console.log("\n🏗️ 初始化基金...");
-            const initAmount = ethers.parseUnits("1000", 6); // 1000 USDC
+            const initAmount = ethers.parseUnits("1000000", 6); // 1,000,000 USDC
             
             // 批准USDC
             console.log("批准USDC使用...");

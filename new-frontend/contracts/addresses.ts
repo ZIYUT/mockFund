@@ -1,22 +1,21 @@
 // Sepolia 测试网合约地址
 export const CONTRACT_ADDRESSES = {
   // 主要合约
-  MockFund: "0xD1e3078E1c64D46583e39bbF2aF03e867f93fD7D",
-  FundShareToken: "0xD81aeF72Ae7Ecf8cc7d1029a52e6882566c93136",
+  MockFund: "0x9fFB513271065CFfE4Fda7DA3E610Df629101F27",
+  FundShareToken: "0xD3eC59d9B6bE6A97D47D5349ba7792c0b0C3594f",
   
   // 代币合约
-  MockUSDC: "0x3664cB1F94442d995f9Ae62062CB26f5A77F58CB",
-  MockTokensFactory: "0xF789421d1ed0D65c65aa076CB119bfBc028f554D",
+  MockUSDC: "0xA51E19C25DBb5B1F41cE70bDdA89A65284e8EfF1",
   
   // 服务合约
   ChainlinkPriceOracle: "0x95900F1E3FC7e5cbBa11239DAFC5295e28C21fB5",
   UniswapIntegration: "0x41A7F830320aBAab995E26BEFc17Ee72BdD7d216",
   
-  // 各个代币地址（从 MockTokensFactory 合约获取）
-  WBTC: "0x29f2D40B0605204364af54EC677bD022dA425d03",
-  WETH: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
-  LINK: "0x779877A7B0D9E8603169DdbD7836e478b4624789",
-  DAI: "0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6",
+  // 各个代币地址
+  WBTC: "0xfd3f3e529BD01F290eEb89155Cb45EE8a479e37a",
+  WETH: "0xF7f9AD8dC553395e0dE1a019563DeA173401EE77",
+  LINK: "0xACB4654f9C0ff26830C55d49ec62f2Cf05503cc3",
+  DAI: "0x0908A7CD457d594526c8304ef6c66E538073A421",
 };
 
 // Sepolia 测试网 Chainlink 价格预言机地址
@@ -74,7 +73,6 @@ export function updateAddresses(deploymentInfo: any) {
   CONTRACT_ADDRESSES.MockFund = deploymentInfo.contracts.MockFund;
   CONTRACT_ADDRESSES.FundShareToken = deploymentInfo.contracts.FundShareToken;
   CONTRACT_ADDRESSES.MockUSDC = deploymentInfo.contracts.MockUSDC;
-  CONTRACT_ADDRESSES.MockTokensFactory = deploymentInfo.contracts.MockTokensFactory;
   CONTRACT_ADDRESSES.ChainlinkPriceOracle = deploymentInfo.contracts.ChainlinkPriceOracle;
   CONTRACT_ADDRESSES.UniswapIntegration = deploymentInfo.contracts.UniswapIntegration;
   

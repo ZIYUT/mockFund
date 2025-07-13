@@ -4,7 +4,7 @@ import WalletConnect from '@/components/WalletConnect';
 import GetTestTokens from '@/components/GetTestTokens';
 import FundInvestment from '@/components/FundInvestment';
 import FundRedemption from '@/components/FundRedemption';
-import UserPortfolio from '@/components/UserPortfolio';
+import FundPortfolio from '@/components/FundPortfolio';
 
 export default function Web3Page() {
   return (
@@ -29,7 +29,7 @@ export default function Web3Page() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Left Column - Portfolio */}
               <div className="lg:col-span-1">
-                <UserPortfolio />
+                <FundPortfolio />
               </div>
               
               {/* Right Column - Actions */}

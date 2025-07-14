@@ -23,7 +23,7 @@ export async function generatePermitSignature(
   spender: string,
   value: string,
   deadline: number,
-  walletClient: any
+  walletClient: unknown
 ): Promise<PermitSignature> {
   // ERC20Permit的domain separator
   const domain = {

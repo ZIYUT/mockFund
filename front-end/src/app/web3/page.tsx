@@ -1,6 +1,7 @@
 'use client';
 
-import WalletConnect from '@/components/WalletConnect';
+import Link from 'next/link';
+import ConnectionInfo from '@/components/ConnectionInfo';
 import GetTestTokens from '@/components/GetTestTokens';
 import FundInvestment from '@/components/FundInvestment';
 import FundRedemption from '@/components/FundRedemption';
@@ -14,22 +15,24 @@ export default function Web3Page() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">MockFund 投资平台 (Web3版)</h1>
-                  <p className="text-sm text-gray-600">基于区块链的智能投资基金</p>
+                  <h1 className="text-2xl font-bold text-gray-900">MockFund Investment Platform</h1>
+                  <p className="text-sm text-gray-600">Blockchain-based Smart Investment Fund</p>
                 </div>
-                
-                {/* Wallet Connect */}
-                <WalletConnect />
               </div>
             </div>
           </header>
 
           {/* Main Content */}
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Top Section - Portfolio Real-time Prices */}
+            <div className="mb-8">
+              <FundPortfolio />
+            </div>
+            
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column - Portfolio */}
+              {/* Left Column - Connection Info */}
               <div className="lg:col-span-1">
-                <FundPortfolio />
+                <ConnectionInfo />
               </div>
               
               {/* Right Column - Actions */}
@@ -48,9 +51,9 @@ export default function Web3Page() {
             {/* Navigation */}
             <div className="mt-8 text-center">
               <div className="space-x-4">
-                <a href="/" className="text-blue-500 hover:underline">返回主页</a>
-                <a href="/basic" className="text-blue-500 hover:underline">基础功能</a>
-                <a href="/simple" className="text-blue-500 hover:underline">简化测试</a>
+                <Link href="/" className="text-blue-500 hover:underline">Back to Home</Link>
+                <Link href="/basic" className="text-blue-500 hover:underline">Basic Features</Link>
+                <Link href="/simple" className="text-blue-500 hover:underline">Simple Test</Link>
               </div>
             </div>
           </main>

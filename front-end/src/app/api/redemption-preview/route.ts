@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const usdcAmount = parseFloat(amount) * mfcValue;
 
     return NextResponse.json({ usdcAmount: usdcAmount.toString() });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to calculate preview' },
       { status: 500 }

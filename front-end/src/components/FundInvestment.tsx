@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
-import { parseUnits, formatUnits } from 'viem';
 import { useMockFund } from '@/hooks/useMockFund';
 import { useFundData } from '@/hooks/useFundData';
 
@@ -20,7 +18,6 @@ const RefreshIcon = ({ onClick, isSpinning = false }: { onClick: () => void; isS
 );
 
 export default function FundInvestment() {
-  const { isConnected } = useAccount();
   const {
     handleInvest, 
     handleApproveUsdc, 
@@ -127,51 +124,51 @@ export default function FundInvestment() {
     return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-2">投资MFC</h2>
-        <p className="text-gray-600">使用USDC购买MFC代币，参与基金投资</p>
+        <h2 className="text-2xl font-bold mb-2">Invest MFC</h2>
+        <p className="text-gray-600">Use USDC to purchase MFC tokens and participate in fund investment</p>
       </div>
 
-      {/* 投资说明 */}
+      {/* Investment Instructions */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-semibold mb-2 text-blue-800">投资方式</h3>
-        <p className="text-sm text-blue-700">使用传统投资方式：需要先授权USDC，然后执行投资，共两步操作。</p>
+        <h3 className="font-semibold mb-2 text-blue-800">Investment Method</h3>
+        <p className="text-sm text-blue-700">Traditional investment method: First approve USDC, then execute investment in two steps.</p>
       </div>
       
-      {/* 用户余额 */}
+      {/* User Balance */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-blue-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-blue-800">USDC余额</h3>
+          <h3 className="font-semibold text-blue-800">USDC Balance</h3>
           <p className="text-2xl font-bold text-blue-600">
             {parseFloat(userUsdcBalance).toFixed(2)}
           </p>
         </div>
         <div className="bg-green-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-green-800">MFC余额</h3>
+          <h3 className="font-semibold text-green-800">MFC Balance</h3>
           <p className="text-2xl font-bold text-green-600">
             {parseFloat(userMfcBalance).toFixed(2)}
           </p>
         </div>
       </div>
 
-      {/* 投资表单 */}
+      {/* Investment Form */}
       <div className="space-y-4">
       <div>
           <label htmlFor="usdcAmount" className="block text-sm font-medium text-gray-700 mb-2">
-              投资金额 (USDC)
+              Investment Amount (USDC)
             </label>
             <input
               type="number"
             id="usdcAmount"
             value={usdcAmount}
             onChange={(e) => setUsdcAmount(e.target.value)}
-            placeholder="输入USDC数量"
+            placeholder="Enter USDC amount"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             min="0"
               step="0.01"
             />
           </div>
 
-        {/* 快速金额按钮 */}
+        {/* Quick Amount Buttons */}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleQuickAmount('100')}
@@ -199,31 +196,31 @@ export default function FundInvestment() {
           </button>
         </div>
 
-        {/* 投资预览 */}
+        {/* Investment Preview */}
         {usdcAmount && parseFloat(usdcAmount) > 0 && (
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold">投资预览</h3>
+              <h3 className="font-semibold">Investment Preview</h3>
               {!hasCalculatedPreview && (
                 <button
                   onClick={calculatePreview}
                   disabled={isCalculating}
                   className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
                 >
-                  {isCalculating ? '计算中...' : '计算预览'}
+                  {isCalculating ? 'Calculating...' : 'Calculate Preview'}
                 </button>
               )}
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span>投资金额:</span>
+                <span>Investment Amount:</span>
                 <span className="font-medium">{parseFloat(usdcAmount).toFixed(2)} USDC</span>
               </div>
               <div className="flex justify-between items-center">
-                <span>将获得MFC:</span>
+                <span>MFC to Receive:</span>
                 <div className="flex items-center">
                   <span className="font-medium">
-                    {isCalculating ? '计算中...' : hasCalculatedPreview ? `${parseFloat(previewMfc || '0').toFixed(2)} MFC` : '点击计算预览'}
+                    {isCalculating ? 'Calculating...' : hasCalculatedPreview ? `${parseFloat(previewMfc || '0').toFixed(2)} MFC` : 'Click to calculate'}
                   </span>
                   {hasCalculatedPreview && (
                     <RefreshIcon 
@@ -235,7 +232,7 @@ export default function FundInvestment() {
               </div>
               {mfcData && hasCalculatedPreview && (
                 <div className="flex justify-between">
-                  <span>MFC价值:</span>
+                  <span>MFC Value:</span>
                   <span className="font-medium">
                     ${((parseFloat(previewMfc || '0') * parseFloat(mfcData.mfcValue))).toFixed(2)} USD
                   </span>
@@ -245,7 +242,7 @@ export default function FundInvestment() {
           </div>
         )}
 
-        {/* 授权步骤 */}
+        {/* Approval Step */}
         {usdcAmount && parseFloat(usdcAmount) > 0 && needsApproval() && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center space-x-4">
@@ -253,12 +250,8 @@ export default function FundInvestment() {
                 1
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-blue-800">授权USDC</h3>
-                <p className="text-sm text-blue-600">允许MockFund合约使用您的USDC</p>
-                <div className="mt-2 text-sm text-blue-700">
-                  <span>已授权金额: </span>
-                  <span className="font-medium">{hasApproved ? '是' : '否'}</span>
-                </div>
+                <h3 className="font-semibold text-blue-800">Approve USDC</h3>
+                <p className="text-sm text-blue-600">Allow MockFund contract to use your USDC</p>
               </div>
             </div>
             <div className="mt-4">
@@ -267,13 +260,13 @@ export default function FundInvestment() {
                 disabled={isApproving}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
               >
-                {isApproving ? '授权中...' : '授权USDC'}
+                {isApproving ? 'Approving...' : 'Approve USDC'}
               </button>
             </div>
           </div>
         )}
 
-        {/* 投资按钮 */}
+        {/* Investment Button */}
         {usdcAmount && parseFloat(usdcAmount) > 0 && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center space-x-4">
@@ -281,8 +274,8 @@ export default function FundInvestment() {
                 {needsApproval() ? '2' : '1'}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-green-800">执行投资</h3>
-                <p className="text-sm text-green-600">使用USDC购买MFC代币</p>
+                <h3 className="font-semibold text-green-800">Execute Investment</h3>
+                <p className="text-sm text-green-600">Use USDC to purchase MFC tokens</p>
               </div>
             </div>
             <div className="mt-4">
@@ -291,36 +284,25 @@ export default function FundInvestment() {
                 disabled={isInvesting || !canInvest()}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
               >
-                {isInvesting ? '投资中...' : '开始投资'}
+                {isInvesting ? 'Investing...' : 'Start Investment'}
               </button>
             </div>
           </div>
         )}
 
-        {/* 调试信息 */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <h3 className="font-semibold text-gray-800 mb-2">调试信息</h3>
-          <div className="text-sm text-gray-700 space-y-1">
-            <div>投资方式: 传统</div>
-            <div>已点击授权: {hasApproved ? '是' : '否'}</div>
-            <div>需要授权: {needsApproval() ? '是' : '否'}</div>
-            <div>可以投资: {canInvest() ? '是' : '否'}</div>
-            <div>投资金额: {usdcAmount || '0'} USDC</div>
-            <div>USDC余额: {parseFloat(userUsdcBalance).toFixed(2)} USDC</div>
-          </div>
-        </div>
+
       </div>
 
-      {/* 投资说明 */}
+      {/* Investment Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-800 mb-2">投资说明</h3>
+        <h3 className="font-semibold text-blue-800 mb-2">Investment Instructions</h3>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• 最小投资金额: 100 USDC</li>
-          <li>• 投资将获得等值的MFC代币</li>
-          <li>• MFC代表基金份额，可随时赎回</li>
-          <li>• 基金投资组合: 50% USDC + 50% 其他代币</li>
-          <li>• 管理费率: 1%</li>
-          <li>• 需要先授权USDC，然后执行投资</li>
+          <li>• Minimum investment: 100 USDC</li>
+          <li>• Investment will receive equivalent MFC tokens</li>
+          <li>• MFC represents fund shares, redeemable anytime</li>
+          <li>• Fund portfolio: 50% USDC + 50% other tokens</li>
+          <li>• Management fee: 1%</li>
+          <li>• First approve USDC, then execute investment</li>
         </ul>
       </div>
     </div>

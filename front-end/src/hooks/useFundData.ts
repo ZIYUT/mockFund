@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
-import { parseEther, parseUnits, formatEther, formatUnits } from 'viem';
+import { formatEther, formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES, PORTFOLIO_CONFIG } from '../../contracts/addresses';
 import MockFundABI from '../contracts/abis/MockFund.json';
 import MockUSDCABI from '../contracts/abis/MockUSDC.json';
@@ -131,6 +131,8 @@ export function useFundData() {
   // 获取代币价格
   const fetchTokenPrices = async () => {
     try {
+      setIsLoading(true);
+      setError(null);
       const tokens = [
         { symbol: 'WETH', address: CONTRACT_ADDRESSES.WETH, decimals: 18 },
         { symbol: 'WBTC', address: CONTRACT_ADDRESSES.WBTC, decimals: 8 },
@@ -178,6 +180,9 @@ export function useFundData() {
       setTokenPrices(prices);
     } catch (error) {
       console.error('Failed to fetch token prices:', error);
+      setError('Failed to fetch token prices');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -195,7 +200,7 @@ export function useFundData() {
   }, [isInitialized]);
 
   // 计算基金投资组合
-  const calculateFundPortfolio = () => {
+  const calculateFundPortfolio = useCallback(() => {
     if (!fundBalances || !tokenPrices.length || !nav) return;
 
     const portfolio: FundPortfolio[] = [];
@@ -229,10 +234,10 @@ export function useFundData() {
     }
 
     setFundPortfolio(portfolio);
-  };
+  }, [fundBalances, tokenPrices, nav]);
 
   // 计算MFC数据
-  const calculateMFCData = () => {
+  const calculateMFCData = useCallback(() => {
     if (!totalSupply || !circulatingSupply || !mfcValue || !nav) return;
 
     const total = parseFloat(formatEther(totalSupply));
@@ -248,7 +253,7 @@ export function useFundData() {
       mfcValue: formatUnits(mfcValue, 6),
       nav: formatUnits(nav, 6),
     });
-  };
+  }, [totalSupply, circulatingSupply, mfcValue, nav]);
 
   // 获取投资预览
   const getInvestmentPreview = async (usdcAmount: string) => {
@@ -314,12 +319,12 @@ export function useFundData() {
   // 计算投资组合
   useEffect(() => {
     calculateFundPortfolio();
-  }, [fundBalances, tokenPrices, nav]);
+  }, [fundBalances, tokenPrices, nav, calculateFundPortfolio]);
 
   // 计算MFC数据
   useEffect(() => {
     calculateMFCData();
-  }, [totalSupply, circulatingSupply, mfcValue, nav]);
+  }, [totalSupply, circulatingSupply, mfcValue, nav, calculateMFCData]);
 
   return {
     // 状态
@@ -339,4 +344,4 @@ export function useFundData() {
     getRedemptionPreview,
     refreshData,
   };
-} 
+}

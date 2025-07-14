@@ -12,7 +12,7 @@ import { useFundData } from '@/hooks/useFundData';
 
 export default function Home() {
   const { isConnected } = useAccount();
-  const { isInitialized, mfcData, tokenPrices, fundPortfolio } = useFundData();
+  const { isInitialized, mfcData } = useFundData();
   const [activeTab, setActiveTab] = useState<'investment' | 'redemption'>('investment');
 
   return (

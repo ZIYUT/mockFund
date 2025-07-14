@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, parseUnits, formatEther, formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from '../../contracts/addresses';
@@ -14,7 +14,7 @@ export function useMockFund() {
   const [error, setError] = useState<string | null>(null);
 
   // 读取基金状态
-  const { data: isInitialized, error: initError, isLoading: initLoading, refetch: refetchInitialized } = useReadContract({
+  const { data: isInitialized, error: initError, isLoading: initLoading } = useReadContract({
     address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
     abi: MockFundABI.abi,
     functionName: 'isInitialized',
@@ -73,7 +73,7 @@ export function useMockFund() {
   });
 
   // 读取USDC授权额度
-  const { data: usdcAllowance, refetch: refetchUsdcAllowance } = useReadContract({
+  const { refetch: refetchUsdcAllowance } = useReadContract({
     address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
     abi: MockUSDCABI.abi,
     functionName: 'allowance',
@@ -370,7 +370,6 @@ export function useMockFund() {
     if (!isInitialized) return null;
 
     try {
-      const amountInWei = parseUnits(usdcAmount, 6);
       const response = await fetch(`/api/preview/invest?amount=${usdcAmount}`);
       const data = await response.json();
       return data.mfcAmount;

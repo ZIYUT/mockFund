@@ -78,42 +78,42 @@ export default function FundInvestment() {
 
 
 
-  // 处理授权
+  // Handle approval
   const handleApproval = async () => {
     if (!usdcAmount || parseFloat(usdcAmount) <= 0) {
-      alert('请输入有效的投资金额');
+      alert('Please enter a valid investment amount');
       return;
     }
 
-    // 检查余额
+    // Check balance
     if (parseFloat(userUsdcBalance) < parseFloat(usdcAmount)) {
-      alert('USDC余额不足');
+      alert('Insufficient USDC balance');
       return;
     }
 
-    // 执行授权
+    // Execute approval
     await handleApproveUsdc(usdcAmount);
-    // 授权完成后设置状态
+    // Set status after approval
     setHasApproved(true);
   };
 
-  // 处理投资
+  // Handle investment
   const handleInvestment = async () => {
     if (!usdcAmount || parseFloat(usdcAmount) <= 0) {
-      alert('请输入有效的投资金额');
+      alert('Please enter a valid investment amount');
       return;
     }
 
     try {
-      // 使用传统方式投资
+      // Use traditional investment method
       await handleInvest(usdcAmount);
       
-      // 重置表单
+      // Reset form
       setUsdcAmount('');
       setPreviewMfc('');
       setHasApproved(false);
     } catch (error) {
-      console.error('投资失败:', error);
+      console.error('Investment failed:', error);
     }
   };
 

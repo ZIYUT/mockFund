@@ -49,7 +49,7 @@ export default function FundRedemption() {
     }
   };
 
-  // 当金额改变时，重置预览状态和授权状态
+  // Reset preview and approval status when amount changes
   useEffect(() => {
     setHasCalculatedPreview(false);
     setPreviewUsdc('');

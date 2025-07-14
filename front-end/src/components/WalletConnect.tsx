@@ -64,27 +64,7 @@ export default function WalletConnect() {
             <p className="text-sm text-green-700 font-mono break-all">{address}</p>
           </div>
           
-          {/* Debug Information */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-gray-800 mb-2">Connection Details</h4>
-            <div className="space-y-2 text-sm">
-              <p>Wallet Status: {isConnected ? 'Connected' : 'Not Connected'}</p>
-              <p>Wallet Address: {address || 'None'}</p>
-              <p>Network ID: {chainId} {chainId === 11155111 ? '✓ Sepolia' : '✗ Wrong Network'}</p>
-              <p>MockFund Contract: {CONTRACT_ADDRESSES.MockFund}</p>
-            </div>
-            
-            <div className="mt-4">
-              <h5 className="font-semibold text-gray-700">Contract Test Results:</h5>
-              <div className="space-y-1 text-sm">
-                <p>isInitialized Loading: {initLoading ? 'Yes' : 'No'}</p>
-                <p>isInitialized Result: {isInitialized ? 'Initialized' : 'Not Initialized'}</p>
-                <p>isInitialized Error: {initError ? initError.message : 'None'}</p>
-                <p>NAV Result: {nav ? nav.toString() : 'None'}</p>
-                <p>NAV Error: {navError ? navError.message : 'None'}</p>
-              </div>
-            </div>
-          </div>
+
           
           <button
             onClick={handleDisconnect}
@@ -104,20 +84,12 @@ export default function WalletConnect() {
             <button
               onClick={() => handleConnect(metaMask())}
               disabled={isPending}
-              className="w-full px-4 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M21.49 4.27c-.32-.73-.84-1.31-1.47-1.69L12.05.5c-.73-.32-1.54-.32-2.27 0L3.98 2.58c-.63.38-1.15.96-1.47 1.69L.5 12c-.32.73-.32 1.54 0 2.27l1.01 7.73c.32.73.84 1.31 1.47 1.69l5.8 2.08c.73.32 1.54.32 2.27 0l5.8-2.08c.63-.38 1.15-.96 1.47-1.69l1.01-7.73c.32-.73.32-1.54 0-2.27L21.49 4.27zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
               </svg>
-              {isPending ? 'Connecting...' : 'Connect MetaMask'}
-            </button>
-            
-            <button
-              onClick={() => handleConnect(injected())}
-              disabled={isPending}
-              className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-            >
-              {isPending ? 'Connecting...' : 'Connect Other Wallet'}
+              {isPending ? 'Connecting...' : 'Connect Wallet'}
             </button>
           </div>
           

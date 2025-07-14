@@ -50,6 +50,8 @@ export async function GET(
     const { token } = await params;
     const tokenLower = token.toLowerCase();
     
+    console.log(`API: Received request for token: ${token}`);
+    
     // 检查是否有对应的 CoinGecko ID
     const coinGeckoId = tokenToCoinGeckoId[tokenLower];
     if (!coinGeckoId) {
@@ -62,7 +64,9 @@ export async function GET(
         dai: 1,
         usdc: 1,
       };
-      return NextResponse.json({ price: fallbackPrices[tokenLower] || 0 });
+      const fallbackPrice = fallbackPrices[tokenLower] || 0;
+      console.log(`API: Returning fallback price for ${token}: ${fallbackPrice}`);
+      return NextResponse.json({ price: fallbackPrice });
     }
 
     // 检查缓存
@@ -71,6 +75,20 @@ export async function GET(
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
       console.log(`Using cached price for ${token}: ${cached.price}`);
       return NextResponse.json({ price: cached.price });
+    }
+
+    // 如果没有 API 密钥，直接返回默认价格
+    if (!COINGECKO_API_KEY) {
+      console.log(`No CoinGecko API key provided, using default prices for ${token}`);
+      const fallbackPrices: { [key: string]: number } = {
+        weth: 3000,
+        wbtc: 60000,
+        link: 15,
+        dai: 1,
+        usdc: 1,
+      };
+      const fallbackPrice = fallbackPrices[tokenLower] || 0;
+      return NextResponse.json({ price: fallbackPrice });
     }
 
     console.log(`Fetching price for ${token} (${coinGeckoId}) from CoinGecko`);

@@ -18,7 +18,7 @@ const RefreshIcon = ({ onClick, isSpinning = false }: { onClick: () => void; isS
 );
 
 export default function FundRedemption() {
-  const { handleRedeem, handleApproveMfc, userMfcBalance, isRedeeming } = useMockFund();
+  const { handleRedeem, handleApproveMfc, userMfcBalance, isRedeeming, isApproving } = useMockFund();
   const { getRedemptionPreview, userUsdcBalance, mfcData } = useFundData();
   
   const [mfcAmount, setMfcAmount] = useState('');
@@ -55,6 +55,19 @@ export default function FundRedemption() {
     setPreviewUsdc('');
     setHasMfcApproved(false);
   }, [mfcAmount]);
+
+  // Check if approval is needed
+  const needsApproval = () => {
+    if (!mfcAmount || parseFloat(mfcAmount) <= 0) return false;
+    return !hasMfcApproved;
+  };
+
+  // Check if redemption can be executed
+  const canRedeem = () => {
+    if (!mfcAmount || parseFloat(mfcAmount) <= 0) return false;
+    if (parseFloat(userMfcBalance) < parseFloat(mfcAmount)) return false;
+    return hasMfcApproved;
+  };
 
   // MFC Approval Handler
   const handleMfcApproval = async () => {
@@ -106,6 +119,12 @@ export default function FundRedemption() {
       <div>
         <h2 className="text-2xl font-bold mb-2">Redeem MFC</h2>
         <p className="text-gray-600">Redeem MFC tokens to receive equivalent USDC</p>
+      </div>
+
+      {/* Redemption Instructions */}
+      <div className="bg-red-50 p-4 rounded-lg">
+        <h3 className="font-semibold mb-2 text-red-800">Redemption Method</h3>
+        <p className="text-sm text-red-700">Traditional redemption method: First approve MFC, then execute redemption in two steps.</p>
       </div>
       
       {/* User Balance */}
@@ -216,23 +235,52 @@ export default function FundRedemption() {
             </div>
           )}
 
-        {/* Approval and Redemption Buttons */}
-        {!hasMfcApproved ? (
-          <button
-            onClick={handleMfcApproval}
-            disabled={!mfcAmount || parseFloat(mfcAmount) <= 0}
-            className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:cursor-not-allowed"
-          >
-            Approve MFC
-          </button>
-        ) : (
-          <button
-            onClick={handleRedemption}
-            disabled={isRedeeming || !mfcAmount || parseFloat(mfcAmount) <= 0}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:cursor-not-allowed"
-          >
-            {isRedeeming ? 'Redeeming...' : 'Confirm Redemption'}
-          </button>
+        {/* Approval Step */}
+        {mfcAmount && parseFloat(mfcAmount) > 0 && needsApproval() && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-yellow-600 text-white">
+                1
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-800">Approve MFC</h3>
+                <p className="text-sm text-yellow-600">Allow MockFund contract to burn your MFC tokens</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <button
+                onClick={handleMfcApproval}
+                disabled={isApproving}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
+              >
+                {isApproving ? 'Approving...' : 'Approve MFC'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Redemption Step */}
+        {mfcAmount && parseFloat(mfcAmount) > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-red-600 text-white">
+                {needsApproval() ? '2' : '1'}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-800">Execute Redemption</h3>
+                <p className="text-sm text-red-600">Burn MFC tokens to receive USDC</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <button
+                onClick={handleRedemption}
+                disabled={isRedeeming || !canRedeem()}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
+              >
+                {isRedeeming ? 'Redeeming...' : 'Start Redemption'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

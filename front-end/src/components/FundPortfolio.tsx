@@ -1,9 +1,86 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useFundData } from '@/hooks/useFundData';
+import { useHistoricalPrices } from '@/hooks/useHistoricalPrices';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Progress } from './ui/progress';
 
 export default function FundPortfolio() {
-  const { fundPortfolio, tokenPrices, mfcData, isLoading } = useFundData();
+  const { fundPortfolio, tokenPrices, mfcData, isLoading, refreshData } = useFundData();
+  const { 
+    historicalData, 
+    isLoading: historicalLoading, 
+    fetchHistoricalPrices, 
+    calculateMfcHistoricalValue, 
+    calculateHistoricalPortfolioRatios 
+  } = useHistoricalPrices();
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  // Load data only once on mount
+  useEffect(() => {
+    if (!hasLoaded) {
+      setHasLoaded(true);
+      fetchHistoricalPrices();
+    }
+  }, [hasLoaded, fetchHistoricalPrices]);
+
+  // Combined refresh function
+  const handleRefresh = () => {
+    refreshData();
+    fetchHistoricalPrices();
+  };
+
+  // Calculate real portfolio data based on actual token balances and prices
+  const getRealPortfolioData = () => {
+    console.log('getRealPortfolioData called with:', {
+      fundPortfolioLength: fundPortfolio.length,
+      tokenPricesLength: tokenPrices.length,
+      fundPortfolio: fundPortfolio
+    });
+
+    if (!fundPortfolio.length || !tokenPrices.length) {
+      console.log('Using default portfolio data');
+      return [
+        { name: 'USDC', value: 50, color: '#2775CA' },
+        { name: 'WBTC', value: 12.5, color: '#F7931A' },
+        { name: 'WETH', value: 12.5, color: '#627EEA' },
+        { name: 'LINK', value: 12.5, color: '#2A5ADA' },
+        { name: 'DAI', value: 12.5, color: '#F5AC37' },
+      ];
+    }
+
+    const result = fundPortfolio.map((token) => {
+      const colorMap: { [key: string]: string } = {
+        'USDC': '#2775CA',
+        'WBTC': '#F7931A',
+        'WETH': '#627EEA',
+        'LINK': '#2A5ADA',
+        'DAI': '#F5AC37',
+      };
+
+      return {
+        name: token.symbol,
+        value: token.percentage,
+        color: colorMap[token.symbol] || '#666666',
+      };
+    });
+
+    console.log('Calculated portfolio data:', result);
+    return result;
+  };
+
+  // 确保历史数据在组件加载时获取
+  useEffect(() => {
+    if (hasLoaded && historicalData.length === 0) {
+      console.log('FundPortfolio: Fetching historical data...');
+      fetchHistoricalPrices();
+    }
+  }, [hasLoaded, historicalData.length, fetchHistoricalPrices]);
+
+  const portfolioData = getRealPortfolioData();
+  const mfcHistoricalValues = calculateMfcHistoricalValue();
+  const historicalRatios = calculateHistoricalPortfolioRatios();
 
   if (isLoading) {
     return (
@@ -20,99 +97,381 @@ export default function FundPortfolio() {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold mb-4">Portfolio</h2>
+      {/* Header with refresh button */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Portfolio</h2>
+        <button
+          onClick={handleRefresh}
+          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Refresh data"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
       
       {/* Real-time Prices */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-3">Real-time Prices</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {tokenPrices.map((token) => (
-            <div key={token.symbol} className="bg-gray-50 p-3 rounded-lg">
-              <div className="text-sm font-medium text-gray-600">{token.symbol}</div>
-              <div className="text-lg font-bold text-gray-900">
-                ${(token.priceInUSD || 0).toFixed(2)}
+          {tokenPrices.length > 0 ? (
+            tokenPrices.map((token) => (
+              <div key={token.symbol} className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-600">{token.symbol}</div>
+                <div className="text-lg font-bold text-gray-900">
+                  ${(token.priceInUSD || 0).toFixed(2)}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            // 显示默认价格
+            [
+              { symbol: 'USDC', priceInUSD: 1 },
+              { symbol: 'WETH', priceInUSD: 3000 },
+              { symbol: 'WBTC', priceInUSD: 60000 },
+              { symbol: 'LINK', priceInUSD: 15 },
+              { symbol: 'DAI', priceInUSD: 1 },
+            ].map((token) => (
+              <div key={token.symbol} className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-600">{token.symbol}</div>
+                <div className="text-lg font-bold text-gray-900">
+                  ${token.priceInUSD.toFixed(2)}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Fund Portfolio */}
+      {/* MFC Historical Value Chart */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">Fund Asset Allocation</h3>
-        <div className="space-y-3">
-          {fundPortfolio.map((token) => (
-            <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {token.symbol.charAt(0)}
+        <h3 className="text-lg font-semibold mb-3">MFC Historical Value (Past Year)</h3>
+        <Card>
+          <CardHeader>
+            <CardTitle>MFC Value Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 relative">
+              {mfcHistoricalValues.length > 0 ? (
+                <div className="w-full h-full flex items-end justify-between space-x-1">
+                  {mfcHistoricalValues.slice(-12).map((data, index) => {
+                    const maxValue = Math.max(...mfcHistoricalValues.map(d => d.price));
+                    const height = (data.price / maxValue) * 100;
+                    return (
+                      <div key={index} className="flex-1 flex flex-col items-center">
+                        <div 
+                          className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t"
+                          style={{ height: `${height}%` }}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 transform rotate-45 origin-left">
+                          {new Date(data.date).toLocaleDateString('en-US', { month: 'short' })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                  <div className="font-medium">{token.name}</div>
-                  <div className="text-sm text-gray-600">
-                    {parseFloat(token.balance).toLocaleString()} {token.symbol}
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  {historicalLoading ? 'Loading historical data...' : 'No historical data available'}
+                </div>
+              )}
+            </div>
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">
+                <strong>Note:</strong> This chart shows the historical MFC value based on past year's token prices. 
+                It represents the theoretical value of 1 MFC token over time, calculated using historical price data 
+                for the underlying assets (50% USDC + 12.5% each of WBTC, WETH, LINK, DAI). 
+                This is for reference purposes only and does not predict future performance.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Portfolio Charts */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Portfolio Charts</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Pie Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Portfolio Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center">
+                <div className="relative w-48 h-48">
+                  {/* Simplified pie chart display */}
+                  <div className="w-full h-full rounded-full border-8 border-gray-200 relative overflow-hidden">
+                    {portfolioData.map((item, index) => {
+                      const startAngle = portfolioData
+                        .slice(0, index)
+                        .reduce((sum, d) => sum + (d.value / 100) * 360, 0);
+                      const endAngle = startAngle + (item.value / 100) * 360;
+                      
+                      return (
+                        <div
+                          key={item.name}
+                          className="absolute inset-0"
+                          style={{
+                            background: `conic-gradient(from ${startAngle}deg, ${item.color} 0deg, ${item.color} ${endAngle - startAngle}deg, transparent ${endAngle - startAngle}deg)`
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
+              
+              {/* Legend */}
+              <div className="mt-6 space-y-2">
+                {portfolioData.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-medium">{item.value}%</span>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
+            </CardContent>
+          </Card>
+
+          {/* Historical Portfolio Ratio Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Historical Portfolio Ratios (Past Year)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 relative">
+                {Object.keys(historicalRatios).length > 0 ? (
+                  <div className="w-full h-full">
+                    {/* Chart container */}
+                    <div className="w-full h-48 flex items-end justify-between space-x-1">
+                      {Object.keys(historicalRatios).slice(-12).map((date, index) => {
+                        const ratios = historicalRatios[date];
+                        const tokens = ['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'];
+                        const colors = ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'];
+                        
+                        return (
+                          <div key={index} className="flex-1 flex flex-col items-center space-y-1">
+                            {tokens.map((token, tokenIndex) => {
+                              const ratio = ratios[token] || 0;
+                              return (
+                                <div 
+                                  key={token}
+                                  className="w-full rounded-sm"
+                                  style={{ 
+                                    height: `${ratio}%`,
+                                    backgroundColor: colors[tokenIndex],
+                                    minHeight: '2px'
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* X-axis labels */}
+                    <div className="flex justify-between mt-2">
+                      {Object.keys(historicalRatios).slice(-12).map((date, index) => (
+                        <div key={index} className="text-xs text-gray-500 transform rotate-45 origin-left">
+                          {new Date(date).toLocaleDateString('en-US', { month: 'short' })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    {historicalLoading ? 'Loading historical data...' : 'No historical data available'}
+                  </div>
+                )}
+              </div>
+              
+              {/* Legend */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                {['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'].map((token, index) => (
+                  <div key={token} className="flex items-center space-x-1">
+                    <div 
+                      className="w-3 h-3 rounded-sm"
+                      style={{ backgroundColor: ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'][index] }}
+                    />
+                    <span className="text-xs">{token}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>Note:</strong> This chart shows how portfolio ratios have changed over the past year 
+                  based on historical token price movements. The stacked bars represent the percentage allocation 
+                  of each token in the portfolio over time.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Fund Portfolio Details */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Fund Asset Allocation</h3>
+        <div className="space-y-3">
+          {fundPortfolio.length > 0 ? (
+            fundPortfolio.map((token) => (
+              <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {token.symbol.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-medium">{token.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {parseFloat(token.balance).toLocaleString()} {token.symbol}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            // 显示默认资产分配
+            [
+              { symbol: 'USDC', name: 'USD Coin', balance: '1000000', balanceInUSD: 1000000, percentage: 50 },
+              { symbol: 'WETH', name: 'Wrapped Ether', balance: '100', balanceInUSD: 300000, percentage: 15 },
+              { symbol: 'WBTC', name: 'Wrapped Bitcoin', balance: '5', balanceInUSD: 300000, percentage: 15 },
+              { symbol: 'LINK', name: 'Chainlink', balance: '20000', balanceInUSD: 300000, percentage: 15 },
+              { symbol: 'DAI', name: 'Dai Stablecoin', balance: '300000', balanceInUSD: 300000, percentage: 15 },
+            ].map((token) => (
+              <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {token.symbol.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-medium">{token.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {parseFloat(token.balance).toLocaleString()} {token.symbol}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
       {/* MFC Supply Progress */}
-      {mfcData && (
-        <div>
-          <h3 className="text-lg font-semibold mb-3">MFC Supply</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between text-sm">
-              <span>Total Supply</span>
-              <span className="font-medium">{parseFloat(mfcData.totalSupply).toLocaleString()} MFC</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Circulating</span>
-              <span className="font-medium">{parseFloat(mfcData.circulatingSupply).toLocaleString()} MFC</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Available</span>
-              <span className="font-medium">{parseFloat(mfcData.availableSupply).toLocaleString()} MFC</span>
-            </div>
-            
-            {/* Progress Bar */}
-            <div className="mt-3">
-              <div className="flex justify-between text-sm mb-1">
-                <span>Investment Progress</span>
-                <span>{mfcData.progressPercentage.toFixed(1)}%</span>
+      <div>
+        <h3 className="text-lg font-semibold mb-3">MFC Supply</h3>
+        <div className="space-y-4">
+          {mfcData ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span>Total Supply</span>
+                <span className="font-medium">{parseFloat(mfcData.totalSupply).toLocaleString()} MFC</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div 
-                  className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${mfcData.progressPercentage}%` }}
-                ></div>
+              <div className="flex justify-between text-sm">
+                <span>Circulating</span>
+                <span className="font-medium">{parseFloat(mfcData.circulatingSupply).toLocaleString()} MFC</span>
               </div>
-            </div>
+              <div className="flex justify-between text-sm">
+                <span>Available</span>
+                <span className="font-medium">{parseFloat(mfcData.availableSupply).toLocaleString()} MFC</span>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mt-3">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Investment Progress</span>
+                  <span>{mfcData.progressPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${mfcData.progressPercentage}%` }}
+                  ></div>
+                </div>
+              </div>
 
-            {/* MFC Value */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <div className="text-sm text-blue-600">MFC Value</div>
-                <div className="text-lg font-bold text-blue-800">
-                  ${parseFloat(mfcData.mfcValue).toFixed(2)}
+              {/* MFC Value */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="text-sm text-blue-600">MFC Value</div>
+                  <div className="text-lg font-bold text-blue-800">
+                    ${parseFloat(mfcData.mfcValue).toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="text-sm text-green-600">Fund NAV</div>
+                  <div className="text-lg font-bold text-green-800">
+                    ${parseFloat(mfcData.nav).toLocaleString()}
+                  </div>
                 </div>
               </div>
-              <div className="bg-green-50 p-3 rounded-lg">
-                <div className="text-sm text-green-600">Fund NAV</div>
-                <div className="text-lg font-bold text-green-800">
-                  ${parseFloat(mfcData.nav).toLocaleString()}
+            </>
+          ) : (
+            // 显示默认 MFC 数据
+            <>
+              <div className="flex justify-between text-sm">
+                <span>Total Supply</span>
+                <span className="font-medium">1,000,000 MFC</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Circulating</span>
+                <span className="font-medium">500,000 MFC</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Available</span>
+                <span className="font-medium">500,000 MFC</span>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mt-3">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Investment Progress</span>
+                  <span>50.0%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300"
+                    style={{ width: '50%' }}
+                  ></div>
                 </div>
               </div>
-            </div>
-          </div>
+
+              {/* MFC Value */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="text-sm text-blue-600">MFC Value</div>
+                  <div className="text-lg font-bold text-blue-800">
+                    $1.02
+                  </div>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="text-sm text-green-600">Fund NAV</div>
+                  <div className="text-lg font-bold text-green-800">
+                    $2,200,000
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

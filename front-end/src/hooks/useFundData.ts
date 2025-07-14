@@ -205,61 +205,87 @@ export function useFundData() {
     }
   }, [isInitialized]);
 
-  // 计算基金投资组合
+  // 计算基金投资组合 - 基于实际合约数据和动态价格
   const calculateFundPortfolio = useCallback(() => {
     console.log('calculateFundPortfolio called with:', {
       fundBalances: !!fundBalances,
       tokenPricesLength: tokenPrices.length,
-      nav: !!nav
+      mfcValue: !!mfcValue
     });
     
-    if (!fundBalances || !tokenPrices.length || !nav) {
+    if (!fundBalances || !tokenPrices.length) {
       console.log('calculateFundPortfolio: Missing required data, using default portfolio');
-      // 使用默认投资组合数据
+      // 使用默认价格（基于合约固定汇率）
+      const usdcPrice = tokenPrices.find(p => p.symbol === 'USDC')?.priceInUSD || 1;
+      const wethPrice = tokenPrices.find(p => p.symbol === 'WETH')?.priceInUSD || 3000; // 修正：3000 USDC per WETH
+      const wbtcPrice = tokenPrices.find(p => p.symbol === 'WBTC')?.priceInUSD || 115000; // 修正：115000 USDC per WBTC
+      const linkPrice = tokenPrices.find(p => p.symbol === 'LINK')?.priceInUSD || 15; // 修正：15 USDC per LINK
+      const daiPrice = tokenPrices.find(p => p.symbol === 'DAI')?.priceInUSD || 1;
+      
+      // 计算MFC当前价值（如果有的话）
+      const currentMfcValue = mfcValue ? parseFloat(formatUnits(mfcValue, 6)) : 2.0; // 默认2.0 USDC/MFC
+      
+      // 固定的MFC组合数据（每个MFC包含的代币数量）
+        // 使用预设的固定值，不从合约读取
+        const fixedUsdcAmount = 0.5; // 0.5 USDC per MFC
+        const fixedWethAmount = 0.000041667; // 0.000041667 WETH per MFC (基于3000 USDC/WETH)
+        const fixedWbtcAmount = 0.00000108; // 0.00000108 WBTC per MFC (基于115000 USDC/WBTC)
+        const fixedLinkAmount = 0.00833; // 0.00833 LINK per MFC (基于15 USDC/LINK)
+        const fixedDaiAmount = 0.125; // 0.125 DAI per MFC (基于1 USDC/DAI)
+      
+      // 计算每种代币的USD价值
+      const usdcValue = fixedUsdcAmount * usdcPrice;
+      const wethValue = fixedWethAmount * wethPrice;
+      const wbtcValue = fixedWbtcAmount * wbtcPrice;
+      const linkValue = fixedLinkAmount * linkPrice;
+      const daiValue = fixedDaiAmount * daiPrice;
+      
+      const totalValue = usdcValue + wethValue + wbtcValue + linkValue + daiValue;
+      
       const defaultPortfolio: FundPortfolio[] = [
         {
           token: CONTRACT_ADDRESSES.MockUSDC,
           symbol: 'USDC',
           name: 'USD Coin',
-          balance: '1000000',
-          balanceInUSD: 1000000,
-          percentage: 50,
+          balance: fixedUsdcAmount.toString(),
+          balanceInUSD: usdcValue,
+          percentage: (usdcValue / totalValue) * 100,
           decimals: 6,
         },
         {
           token: CONTRACT_ADDRESSES.WETH,
           symbol: 'WETH',
           name: 'Wrapped Ether',
-          balance: '100',
-          balanceInUSD: 300000,
-          percentage: 15,
+          balance: fixedWethAmount.toString(),
+          balanceInUSD: wethValue,
+          percentage: (wethValue / totalValue) * 100,
           decimals: 18,
         },
         {
           token: CONTRACT_ADDRESSES.WBTC,
           symbol: 'WBTC',
           name: 'Wrapped Bitcoin',
-          balance: '5',
-          balanceInUSD: 300000,
-          percentage: 15,
+          balance: fixedWbtcAmount.toString(),
+          balanceInUSD: wbtcValue,
+          percentage: (wbtcValue / totalValue) * 100,
           decimals: 8,
         },
         {
           token: CONTRACT_ADDRESSES.LINK,
           symbol: 'LINK',
           name: 'Chainlink',
-          balance: '20000',
-          balanceInUSD: 300000,
-          percentage: 15,
+          balance: fixedLinkAmount.toString(),
+          balanceInUSD: linkValue,
+          percentage: (linkValue / totalValue) * 100,
           decimals: 18,
         },
         {
           token: CONTRACT_ADDRESSES.DAI,
           symbol: 'DAI',
           name: 'Dai Stablecoin',
-          balance: '300000',
-          balanceInUSD: 300000,
-          percentage: 15,
+          balance: fixedDaiAmount.toString(),
+          balanceInUSD: daiValue,
+          percentage: (daiValue / totalValue) * 100,
           decimals: 18,
         },
       ];
@@ -268,9 +294,29 @@ export function useFundData() {
     }
 
     const portfolio: FundPortfolio[] = [];
-    const totalValue = parseFloat(formatUnits(nav, 6));
-    console.log('calculateFundPortfolio: Total NAV value:', totalValue);
+    let totalValue = 0;
+    
+    // 首先计算总价值
+    for (let i = 0; i < fundBalances.tokens.length; i++) {
+      const tokenAddress = fundBalances.tokens[i];
+      const balance = fundBalances.balances[i];
+      const decimals = fundBalances.decimals[i];
 
+      let symbol = 'Unknown';
+      if (tokenAddress === CONTRACT_ADDRESSES.MockUSDC) symbol = 'USDC';
+      else if (tokenAddress === CONTRACT_ADDRESSES.WETH) symbol = 'WETH';
+      else if (tokenAddress === CONTRACT_ADDRESSES.WBTC) symbol = 'WBTC';
+      else if (tokenAddress === CONTRACT_ADDRESSES.LINK) symbol = 'LINK';
+      else if (tokenAddress === CONTRACT_ADDRESSES.DAI) symbol = 'DAI';
+
+      const tokenPrice = tokenPrices.find(p => p.symbol === symbol);
+      const balanceInUSD = tokenPrice ? parseFloat(formatUnits(balance, decimals)) * (tokenPrice.priceInUSD || 0) : 0;
+      totalValue += balanceInUSD;
+    }
+    
+    console.log('calculateFundPortfolio: Total portfolio value:', totalValue);
+
+    // 然后计算每个代币的百分比
     for (let i = 0; i < fundBalances.tokens.length; i++) {
       const tokenAddress = fundBalances.tokens[i];
       const balance = fundBalances.balances[i];

@@ -14,6 +14,12 @@ export function useHistoricalPrices() {
   const [historicalData, setHistoricalData] = useState<TokenHistoricalData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 自动获取历史价格数据
+  useEffect(() => {
+    console.log('useHistoricalPrices: Auto-fetching historical prices on mount');
+    fetchHistoricalPrices();
+  }, []);
 
   const fetchHistoricalPrices = async () => {
     setIsLoading(true);
@@ -58,7 +64,7 @@ export function useHistoricalPrices() {
         }
       }
 
-      console.log('useHistoricalPrices: Final historical data:', historicalData.length, 'tokens');
+      console.log('useHistoricalPrices: Successfully loaded', historicalData.length, 'tokens with historical data');
       setHistoricalData(historicalData);
     } catch (error) {
       console.error('Failed to fetch historical prices:', error);
@@ -111,37 +117,42 @@ export function useHistoricalPrices() {
     return prices;
   };
 
-  // 计算 MFC 历史价值
-  const calculateMfcHistoricalValue = (): HistoricalPrice[] => {
-    if (historicalData.length === 0) return [];
+  // 计算 MFC 历史价值 - 基于实际合约组成
+  const calculateMfcHistoricalValue = (fundComposition?: any): HistoricalPrice[] => {
+    if (historicalData.length === 0) {
+      return [];
+    }
 
     const mfcValues: HistoricalPrice[] = [];
     
     // 获取所有代币的日期范围
     const allDates = historicalData[0]?.prices.map(p => p.date) || [];
     
+    // 默认组成（基于合约初始化逻辑）
+    // 根据MockFund.sol合约：
+    // - 初始资金：1,000,000 USDC
+    // - 初始MFC供应量：1,000,000 MFC
+    // - USDC分配：50% (500,000 USDC)
+    // - 代币分配：50% (500,000 USDC)，平均分配给4种代币，每种125,000 USDC
+    // - 每个MFC包含：0.5 USDC + 对应比例的代币
+    const defaultComposition = {
+      usdcAmount: 0.5, // 0.5 USDC per MFC
+      tokenRatios: {
+        'WETH': 0.000041667, // 0.000041667 WETH per MFC (基于3000 USDC/WETH)
+        'WBTC': 0.00000108, // 0.00000108 WBTC per MFC (基于115000 USDC/WBTC)
+        'LINK': 0.00833, // 0.00833 LINK per MFC (基于15 USDC/LINK)
+        'DAI': 0.125 // 0.125 DAI per MFC (基于1 USDC/DAI)
+      }
+    };
+    
     allDates.forEach(date => {
-      let totalValue = 0.5; // 基础 USDC 价值
+      let totalValue = defaultComposition.usdcAmount; // 基础 USDC 价值
       
       // 计算每种代币的价值
       historicalData.forEach(tokenData => {
         const priceData = tokenData.prices.find(p => p.date === date);
         if (priceData) {
-          let tokenAmount = 0;
-          switch (tokenData.symbol) {
-            case 'WETH':
-              tokenAmount = 0.125; // 12.5% 的 WETH
-              break;
-            case 'WBTC':
-              tokenAmount = 0.125; // 12.5% 的 WBTC
-              break;
-            case 'LINK':
-              tokenAmount = 0.125; // 12.5% 的 LINK
-              break;
-            case 'DAI':
-              tokenAmount = 0.125; // 12.5% 的 DAI
-              break;
-          }
+          const tokenAmount = defaultComposition.tokenRatios[tokenData.symbol as keyof typeof defaultComposition.tokenRatios] || 0;
           totalValue += tokenAmount * priceData.price;
         }
       });
@@ -152,36 +163,36 @@ export function useHistoricalPrices() {
     return mfcValues;
   };
 
-  // 计算历史投资组合比例
-  const calculateHistoricalPortfolioRatios = (): { [date: string]: { [symbol: string]: number } } => {
-    if (historicalData.length === 0) return {};
+  // 计算历史投资组合比例 - 基于实际合约组成
+  const calculateHistoricalPortfolioRatios = (fundComposition?: any): { [date: string]: { [symbol: string]: number } } => {
+    if (historicalData.length === 0) {
+      return {};
+    }
 
     const ratios: { [date: string]: { [symbol: string]: number } } = {};
     const allDates = historicalData[0]?.prices.map(p => p.date) || [];
 
+    // 默认组成（基于合约初始化逻辑）
+    // 与calculateMfcHistoricalValue函数保持一致
+    const defaultComposition = {
+        usdcAmount: 0.5, // 0.5 USDC per MFC
+        tokenRatios: {
+          WETH: 0.000041667, // 0.000041667 WETH per MFC (基于3000 USDC/WETH)
+          WBTC: 0.00000108, // 0.00000108 WBTC per MFC (基于115000 USDC/WBTC)
+          LINK: 0.00833, // 0.00833 LINK per MFC (基于15 USDC/LINK)
+          DAI: 0.125 // 0.125 DAI per MFC (基于1 USDC/DAI)
+        }
+      };
+
     allDates.forEach(date => {
-      let totalValue = 0.5; // 基础 USDC 价值
-      const tokenValues: { [symbol: string]: number } = { USDC: 0.5 };
+      let totalValue = defaultComposition.usdcAmount; // 基础 USDC 价值
+      const tokenValues: { [symbol: string]: number } = { USDC: defaultComposition.usdcAmount };
 
       // 计算每种代币的价值
       historicalData.forEach(tokenData => {
         const priceData = tokenData.prices.find(p => p.date === date);
         if (priceData) {
-          let tokenAmount = 0;
-          switch (tokenData.symbol) {
-            case 'WETH':
-              tokenAmount = 0.125;
-              break;
-            case 'WBTC':
-              tokenAmount = 0.125;
-              break;
-            case 'LINK':
-              tokenAmount = 0.125;
-              break;
-            case 'DAI':
-              tokenAmount = 0.125;
-              break;
-          }
+          const tokenAmount = defaultComposition.tokenRatios[tokenData.symbol as keyof typeof defaultComposition.tokenRatios] || 0;
           const value = tokenAmount * priceData.price;
           tokenValues[tokenData.symbol] = value;
           totalValue += value;
@@ -206,4 +217,4 @@ export function useHistoricalPrices() {
     calculateMfcHistoricalValue,
     calculateHistoricalPortfolioRatios,
   };
-} 
+}

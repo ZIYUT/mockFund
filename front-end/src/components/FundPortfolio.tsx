@@ -17,14 +17,6 @@ export default function FundPortfolio() {
   } = useHistoricalPrices();
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Load data only once on mount
-  useEffect(() => {
-    if (!hasLoaded) {
-      setHasLoaded(true);
-      fetchHistoricalPrices();
-    }
-  }, [hasLoaded, fetchHistoricalPrices]);
-
   // Combined refresh function
   const handleRefresh = () => {
     refreshData();
@@ -33,14 +25,7 @@ export default function FundPortfolio() {
 
   // Calculate real portfolio data based on actual token balances and prices
   const getRealPortfolioData = () => {
-    console.log('getRealPortfolioData called with:', {
-      fundPortfolioLength: fundPortfolio.length,
-      tokenPricesLength: tokenPrices.length,
-      fundPortfolio: fundPortfolio
-    });
-
     if (!fundPortfolio.length || !tokenPrices.length) {
-      console.log('Using default portfolio data');
       return [
         { name: 'USDC', value: 50, color: '#2775CA' },
         { name: 'WBTC', value: 12.5, color: '#F7931A' },
@@ -66,21 +51,27 @@ export default function FundPortfolio() {
       };
     });
 
-    console.log('Calculated portfolio data:', result);
     return result;
   };
 
-  // 确保历史数据在组件加载时获取
-  useEffect(() => {
-    if (hasLoaded && historicalData.length === 0) {
-      console.log('FundPortfolio: Fetching historical data...');
-      fetchHistoricalPrices();
-    }
-  }, [hasLoaded, historicalData.length, fetchHistoricalPrices]);
-
   const portfolioData = getRealPortfolioData();
-  const mfcHistoricalValues = calculateMfcHistoricalValue();
-  const historicalRatios = calculateHistoricalPortfolioRatios();
+  
+  // 只有在历史数据加载完成且不为空时才计算
+  const mfcHistoricalValues = historicalData.length > 0 ? calculateMfcHistoricalValue() : [];
+  const historicalRatios = historicalData.length > 0 ? calculateHistoricalPortfolioRatios() : {};
+
+  // 调试日志 - 检查数据状态
+  console.log('FundPortfolio Debug:', {
+    historicalDataLength: historicalData.length,
+    mfcHistoricalValuesLength: mfcHistoricalValues.length,
+    historicalRatiosKeys: Object.keys(historicalRatios).length,
+    historicalLoading,
+    hasLoaded
+  });
+  
+  if (historicalData.length > 0) {
+    console.log('Historical data available:', historicalData.map(d => ({ symbol: d.symbol, pricesLength: d.prices?.length || 0 })));
+  }
 
   if (isLoading) {
     return (
@@ -234,149 +225,165 @@ export default function FundPortfolio() {
                       />
                       <span className="text-sm">{item.name}</span>
                     </div>
-                    <span className="text-sm font-medium">{item.value}%</span>
+                    <span className="text-sm font-medium">{item.value.toFixed(1)}%</span>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Historical Portfolio Ratio Chart */}
+          {/* Fund Asset Allocation */}
           <Card>
             <CardHeader>
-              <CardTitle>Historical Portfolio Ratios (Past Year)</CardTitle>
+              <CardTitle>Fund Asset Allocation</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64 relative">
-                {Object.keys(historicalRatios).length > 0 ? (
-                  <div className="w-full h-full">
-                    {/* Chart container */}
-                    <div className="w-full h-48 flex items-end justify-between space-x-1">
-                      {Object.keys(historicalRatios).slice(-12).map((date, index) => {
-                        const ratios = historicalRatios[date];
-                        const tokens = ['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'];
-                        const colors = ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'];
-                        
-                        return (
-                          <div key={index} className="flex-1 flex flex-col items-center space-y-1">
-                            {tokens.map((token, tokenIndex) => {
-                              const ratio = ratios[token] || 0;
-                              return (
-                                <div 
-                                  key={token}
-                                  className="w-full rounded-sm"
-                                  style={{ 
-                                    height: `${ratio}%`,
-                                    backgroundColor: colors[tokenIndex],
-                                    minHeight: '2px'
-                                  }}
-                                />
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* X-axis labels */}
-                    <div className="flex justify-between mt-2">
-                      {Object.keys(historicalRatios).slice(-12).map((date, index) => (
-                        <div key={index} className="text-xs text-gray-500 transform rotate-45 origin-left">
-                          {new Date(date).toLocaleDateString('en-US', { month: 'short' })}
+              <div className="space-y-3">
+                {fundPortfolio.length > 0 ? (
+                  fundPortfolio.map((token) => (
+                    <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          {token.symbol.charAt(0)}
                         </div>
-                      ))}
+                        <div>
+                          <div className="font-medium">{token.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {(() => {
+                              const balance = parseFloat(token.balance);
+                              // 为WETH和WBTC显示更多小数位数，避免显示0
+                              if (token.symbol === 'WETH' || token.symbol === 'WBTC') {
+                                return balance.toFixed(8);
+                              } else if (token.symbol === 'LINK') {
+                                return balance.toFixed(3);
+                              } else {
+                                return balance.toLocaleString();
+                              }
+                            })()} {token.symbol}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
+                      </div>
                     </div>
-                  </div>
+                  ))
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    {historicalLoading ? 'Loading historical data...' : 'No historical data available'}
-                  </div>
+                  // 显示默认资产分配
+                  [
+                    { symbol: 'USDC', name: 'USD Coin', balance: '1000000', balanceInUSD: 1000000, percentage: 50 },
+                    { symbol: 'WETH', name: 'Wrapped Ether', balance: '100', balanceInUSD: 300000, percentage: 15 },
+                    { symbol: 'WBTC', name: 'Wrapped Bitcoin', balance: '5', balanceInUSD: 300000, percentage: 15 },
+                    { symbol: 'LINK', name: 'Chainlink', balance: '20000', balanceInUSD: 300000, percentage: 15 },
+                    { symbol: 'DAI', name: 'Dai Stablecoin', balance: '300000', balanceInUSD: 300000, percentage: 15 },
+                  ].map((token) => (
+                    <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          {token.symbol.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-medium">{token.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {parseFloat(token.balance).toLocaleString()} {token.symbol}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
+                      </div>
+                    </div>
+                  ))
                 )}
-              </div>
-              
-              {/* Legend */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'].map((token, index) => (
-                  <div key={token} className="flex items-center space-x-1">
-                    <div 
-                      className="w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'][index] }}
-                    />
-                    <span className="text-xs">{token}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  <strong>Note:</strong> This chart shows how portfolio ratios have changed over the past year 
-                  based on historical token price movements. The stacked bars represent the percentage allocation 
-                  of each token in the portfolio over time.
-                </p>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Fund Portfolio Details */}
+      {/* Historical Portfolio Ratios - moved below MFC chart */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">Fund Asset Allocation</h3>
-        <div className="space-y-3">
-          {fundPortfolio.length > 0 ? (
-            fundPortfolio.map((token) => (
-              <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    {token.symbol.charAt(0)}
+        <h3 className="text-lg font-semibold mb-3">Historical Portfolio Ratios (Past Year)</h3>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="h-64 relative">
+              {Object.keys(historicalRatios).length > 0 ? (
+                <div className="w-full h-full">
+                  {/* Chart container - horizontal layout */}
+                  <div className="w-full h-48 flex items-end justify-between space-x-1">
+                    {Object.keys(historicalRatios).slice(-12).map((date, index) => {
+                      const ratios = historicalRatios[date];
+                      const tokens = ['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'];
+                      const colors = ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'];
+                      
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center space-y-1">
+                          {tokens.map((token, tokenIndex) => {
+                            const ratio = ratios[token] || 0;
+                            return (
+                              <div 
+                                key={token}
+                                className="w-full rounded-sm"
+                                style={{ 
+                                  height: `${ratio}%`,
+                                  backgroundColor: colors[tokenIndex],
+                                  minHeight: '2px'
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <div className="font-medium">{token.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {parseFloat(token.balance).toLocaleString()} {token.symbol}
-                    </div>
+                  
+                  {/* X-axis labels */}
+                  <div className="flex justify-between mt-2">
+                    {Object.keys(historicalRatios).slice(-12).map((date, index) => (
+                      <div key={index} className="text-xs text-gray-500 transform rotate-45 origin-left">
+                        {new Date(date).toLocaleDateString('en-US', { month: 'short' })}
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  {historicalLoading ? 'Loading historical data...' : 'No historical data available'}
                 </div>
-              </div>
-            ))
-          ) : (
-            // 显示默认资产分配
-            [
-              { symbol: 'USDC', name: 'USD Coin', balance: '1000000', balanceInUSD: 1000000, percentage: 50 },
-              { symbol: 'WETH', name: 'Wrapped Ether', balance: '100', balanceInUSD: 300000, percentage: 15 },
-              { symbol: 'WBTC', name: 'Wrapped Bitcoin', balance: '5', balanceInUSD: 300000, percentage: 15 },
-              { symbol: 'LINK', name: 'Chainlink', balance: '20000', balanceInUSD: 300000, percentage: 15 },
-              { symbol: 'DAI', name: 'Dai Stablecoin', balance: '300000', balanceInUSD: 300000, percentage: 15 },
-            ].map((token) => (
-              <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    {token.symbol.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="font-medium">{token.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {parseFloat(token.balance).toLocaleString()} {token.symbol}
-                    </div>
-                  </div>
+              )}
+            </div>
+            
+            {/* Legend */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'].map((token, index) => (
+                <div key={token} className="flex items-center space-x-1">
+                  <div 
+                    className="w-3 h-3 rounded-sm"
+                    style={{ backgroundColor: ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'][index] }}
+                  />
+                  <span className="text-xs">{token}</span>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold">${token.balanceInUSD.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">{token.percentage.toFixed(1)}%</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))}
+            </div>
+            
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">
+                <strong>Note:</strong> This chart shows how portfolio ratios have changed over the past year 
+                based on historical token price movements. The stacked bars represent the percentage allocation 
+                of each token in the portfolio over time.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+
 
       {/* MFC Supply Progress */}
       <div>
-        <h3 className="text-lg font-semibold mb-3">MFC Supply</h3>
+        <h3 className="text-lg font-semibold mb-3">Mock Found Coin (MFC) Supply</h3>
         <div className="space-y-4">
           {mfcData ? (
             <>

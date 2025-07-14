@@ -22,6 +22,9 @@ const hardhatLocal = {
   },
 };
 
+// 获取 Alchemy API 密钥
+const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || 'lK6-zMgLZpagSlTIbSg5G331IBJrfCQL';
+
 // 创建wagmi配置
 export const config = createConfig({
   chains: [sepolia, hardhatLocal],
@@ -30,7 +33,7 @@ export const config = createConfig({
     metaMask(),
   ],
   transports: {
-    [sepolia.id]: http('https://eth-sepolia.g.alchemy.com/v2/lK6-zMgLZpagSlTIbSg5G331IBJrfCQL'), // 使用 Alchemy 端点
+    [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`), // 使用环境变量中的 Alchemy 端点
     [hardhatLocal.id]: http('http://127.0.0.1:8545'),
   },
 });

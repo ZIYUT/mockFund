@@ -68,9 +68,9 @@ export async function GET(
 
     console.log(`Fetching historical price for ${token} (${coinGeckoId}) from CoinGecko`);
 
-    // 计算日期范围（过去180天）
+    // 计算日期范围（过去一年）
     const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+    const startDate = new Date(endDate.getFullYear() - 1, endDate.getMonth(), endDate.getDate());
     
     const from = Math.floor(startDate.getTime() / 1000);
     const to = Math.floor(endDate.getTime() / 1000);
@@ -110,9 +110,9 @@ export async function GET(
 function generateSimulatedHistoricalData(token: string) {
   const prices: { date: string; price: number }[] = [];
   const endDate = new Date();
-  const startDate = new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+  const startDate = new Date(endDate.getFullYear() - 1, endDate.getMonth(), endDate.getDate());
 
-  // 生成过去180天的日期（每周一个数据点）
+  // 生成过去一年的日期（每周一个数据点）
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 7)) {
     const date = d.toISOString().split('T')[0];
     
@@ -151,4 +151,4 @@ function generateSimulatedHistoricalData(token: string) {
   }
 
   return prices;
-}
+} 

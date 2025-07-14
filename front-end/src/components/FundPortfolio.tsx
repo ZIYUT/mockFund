@@ -5,22 +5,24 @@ import { useFundData } from '@/hooks/useFundData';
 import { useHistoricalPrices } from '@/hooks/useHistoricalPrices';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
+import TokenLogo from './TokenLogo';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, CartesianGrid, Area } from 'recharts';
 
 export default function FundPortfolio() {
   const { fundPortfolio, tokenPrices, mfcData, isLoading, refreshData } = useFundData();
   const { 
-    historicalData, 
+    historicalData, //: any[]
+    mfcHistoricalValues, //: any[]
+    historicalRatios, //: any
     isLoading: historicalLoading, 
-    fetchHistoricalPrices, 
-    calculateMfcHistoricalValue, 
-    calculateHistoricalPortfolioRatios 
-  } = useHistoricalPrices();
+    fetchAllHistoricalPrices 
+  } = useHistoricalPrices() as any;
   const [hasLoaded, setHasLoaded] = useState(false);
 
   // Combined refresh function
   const handleRefresh = () => {
     refreshData();
-    fetchHistoricalPrices();
+    fetchAllHistoricalPrices();
   };
 
   // Calculate real portfolio data based on actual token balances and prices
@@ -57,8 +59,8 @@ export default function FundPortfolio() {
   const portfolioData = getRealPortfolioData();
   
   // 只有在历史数据加载完成且不为空时才计算
-  const mfcHistoricalValues = historicalData.length > 0 ? calculateMfcHistoricalValue() : [];
-  const historicalRatios = historicalData.length > 0 ? calculateHistoricalPortfolioRatios() : {};
+  // const mfcHistoricalValues = historicalData.length > 0 ? calculateMfcHistoricalValue() : [];
+  // const historicalRatios = historicalData.length > 0 ? calculateHistoricalPortfolioRatios() : {};
 
   // 调试日志 - 检查数据状态
   console.log('FundPortfolio Debug:', {
@@ -70,7 +72,7 @@ export default function FundPortfolio() {
   });
   
   if (historicalData.length > 0) {
-    console.log('Historical data available:', historicalData.map(d => ({ symbol: d.symbol, pricesLength: d.prices?.length || 0 })));
+    console.log('Historical data available:', historicalData.map((d: any) => ({ symbol: d.symbol, pricesLength: d.prices?.length || 0 })));
   }
 
   if (isLoading) {
@@ -137,42 +139,44 @@ export default function FundPortfolio() {
 
       {/* MFC Historical Value Chart */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">MFC Historical Value (Past Year)</h3>
+        <h3 className="text-lg font-semibold mb-3">MFC Historical Value (Past 180 Days)</h3>
         <Card>
           <CardHeader>
-            <CardTitle>MFC Value Trend</CardTitle>
+            <CardTitle>MFC Value Trend (USDC/MFC)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 relative">
-              {mfcHistoricalValues.length > 0 ? (
-                <div className="w-full h-full flex items-end justify-between space-x-1">
-                  {mfcHistoricalValues.slice(-12).map((data, index) => {
-                    const maxValue = Math.max(...mfcHistoricalValues.map(d => d.price));
-                    const height = (data.price / maxValue) * 100;
-                    return (
-                      <div key={index} className="flex-1 flex flex-col items-center">
-                        <div 
-                          className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t"
-                          style={{ height: `${height}%` }}
-                        />
-                        <div className="text-xs text-gray-500 mt-1 transform rotate-45 origin-left">
-                          {new Date(data.date).toLocaleDateString('en-US', { month: 'short' })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  {historicalLoading ? 'Loading historical data...' : 'No historical data available'}
-                </div>
-              )}
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <LineChart data={mfcHistoricalValues}>
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={30} />
+                  <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                  <Tooltip 
+                    formatter={(value: number) => [`Price: ${value.toFixed(2)} USDC/MFC`]}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="priceArea" 
+                    fill="#FF6B6B" 
+                    fillOpacity={0.2}
+                    stroke="none" 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke="#FF6B6B" 
+                    strokeWidth={3} 
+                    dot={false}
+                    name="MFC Value"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">
-                <strong>Note:</strong> This chart shows the historical MFC value based on past year's token prices. 
+                <strong>Note:</strong> This chart shows the historical MFC value based on past 180 days' token prices. 
                 It represents the theoretical value of 1 MFC token over time, calculated using historical price data 
-                for the underlying assets (50% USDC + 12.5% each of WBTC, WETH, LINK, DAI). 
+                for the underlying assets (0.5 USDC + 0.00004167 WETH + 0.00000108 WBTC + 0.008 LINK + 0.125 DAI). 
                 This is for reference purposes only and does not predict future performance.
               </p>
             </div>
@@ -197,7 +201,7 @@ export default function FundPortfolio() {
                     {portfolioData.map((item, index) => {
                       const startAngle = portfolioData
                         .slice(0, index)
-                        .reduce((sum, d) => sum + (d.value / 100) * 360, 0);
+                        .reduce((sum, d: any) => sum + (d.value / 100) * 360, 0);
                       const endAngle = startAngle + (item.value / 100) * 360;
                       
                       return (
@@ -235,7 +239,7 @@ export default function FundPortfolio() {
           {/* Fund Asset Allocation */}
           <Card>
             <CardHeader>
-              <CardTitle>Fund Asset Allocation</CardTitle>
+              <CardTitle>Each MFC contains...</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -243,9 +247,7 @@ export default function FundPortfolio() {
                   fundPortfolio.map((token) => (
                     <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                          {token.symbol.charAt(0)}
-                        </div>
+                        <TokenLogo symbol={token.symbol} size={32} />
                         <div>
                           <div className="font-medium">{token.name}</div>
                           <div className="text-sm text-gray-600">
@@ -280,9 +282,7 @@ export default function FundPortfolio() {
                   ].map((token) => (
                     <div key={token.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                          {token.symbol.charAt(0)}
-                        </div>
+                        <TokenLogo symbol={token.symbol} size={32} />
                         <div>
                           <div className="font-medium">{token.name}</div>
                           <div className="text-sm text-gray-600">
@@ -305,74 +305,43 @@ export default function FundPortfolio() {
 
       {/* Historical Portfolio Ratios - moved below MFC chart */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">Historical Portfolio Ratios (Past Year)</h3>
+        <h3 className="text-lg font-semibold mb-3">Historical Portfolio Ratios (Past 180 Days)</h3>
         <Card>
           <CardContent className="pt-6">
-            <div className="h-64 relative">
-              {Object.keys(historicalRatios).length > 0 ? (
-                <div className="w-full h-full">
-                  {/* Chart container - horizontal layout */}
-                  <div className="w-full h-48 flex items-end justify-between space-x-1">
-                    {Object.keys(historicalRatios).slice(-12).map((date, index) => {
-                      const ratios = historicalRatios[date];
-                      const tokens = ['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'];
-                      const colors = ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'];
-                      
-                      return (
-                        <div key={index} className="flex-1 flex flex-col items-center space-y-1">
-                          {tokens.map((token, tokenIndex) => {
-                            const ratio = ratios[token] || 0;
-                            return (
-                              <div 
-                                key={token}
-                                className="w-full rounded-sm"
-                                style={{ 
-                                  height: `${ratio}%`,
-                                  backgroundColor: colors[tokenIndex],
-                                  minHeight: '2px'
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* X-axis labels */}
-                  <div className="flex justify-between mt-2">
-                    {Object.keys(historicalRatios).slice(-12).map((date, index) => (
-                      <div key={index} className="text-xs text-gray-500 transform rotate-45 origin-left">
-                        {new Date(date).toLocaleDateString('en-US', { month: 'short' })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  {historicalLoading ? 'Loading historical data...' : 'No historical data available'}
-                </div>
-              )}
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <LineChart data={Object.keys(historicalRatios).map(date => ({ date, ...historicalRatios[date] }))}>
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={30} />
+                  <YAxis tick={{ fontSize: 10 }} domain={[0, 22]} tickFormatter={v => `${v}%`} />
+                  <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
+                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <Line type="monotone" dataKey="WBTC" stroke="#F7931A" strokeWidth={3} dot={false} name="WBTC" />
+                  <Line type="monotone" dataKey="WETH" stroke="#627EEA" strokeWidth={3} dot={false} name="WETH" />
+                  <Line type="monotone" dataKey="LINK" stroke="#00D4AA" strokeWidth={3} dot={false} name="LINK" />
+                  <Line type="monotone" dataKey="DAI" stroke="#F5AC37" strokeWidth={3} dot={false} name="DAI" />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            
-            {/* Legend */}
             <div className="mt-4 flex flex-wrap gap-2">
-              {['USDC', 'WBTC', 'WETH', 'LINK', 'DAI'].map((token, index) => (
+              {['WBTC', 'WETH', 'LINK', 'DAI'].map((token, index) => (
                 <div key={token} className="flex items-center space-x-1">
                   <div 
                     className="w-3 h-3 rounded-sm"
-                    style={{ backgroundColor: ['#2775CA', '#F7931A', '#627EEA', '#2A5ADA', '#F5AC37'][index] }}
+                    style={{ backgroundColor: ['#F7931A', '#627EEA', '#00D4AA', '#F5AC37'][index] }}
                   />
                   <span className="text-xs">{token}</span>
                 </div>
               ))}
             </div>
-            
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">
-                <strong>Note:</strong> This chart shows how portfolio ratios have changed over the past year 
-                based on historical token price movements. The stacked bars represent the percentage allocation 
-                of each token in the portfolio over time.
+                <strong>Note:</strong> This chart shows how portfolio ratios have changed over the past 180 days 
+                based on historical token price movements. The lines represent the percentage allocation 
+                of each token in the portfolio over time. This is calculated using the current portfolio composition 
+                applied to historical price data for reference purposes only and does not predict future performance.
+                The different starting percentages reflect the current actual portfolio allocation, which may differ 
+                from the theoretical 12.5% equal distribution due to market price movements over time.
               </p>
             </div>
           </CardContent>

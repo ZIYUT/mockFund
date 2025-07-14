@@ -19,8 +19,18 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">MockFund DeFi Fund</h1>
-          <p className="text-lg text-gray-600">Decentralized Investment Fund with Real-time Chainlink Prices</p>
+          <h1
+            className="text-5xl font-extrabold mb-3 bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 bg-clip-text text-transparent font-serif drop-shadow-lg"
+            style={{ letterSpacing: '0.04em', fontFamily: 'Georgia, Times, serif' }}
+          >
+            MockFund DeFi Fund
+          </h1>
+          <p
+            className="text-xl text-gray-500 font-light tracking-wide"
+            style={{ fontFamily: 'Georgia, Times, serif' }}
+          >
+            Decentralized Investment Fund with Real-time Chainlink Prices
+          </p>
         </div>
 
         {/* Portfolio Real-time Prices - Moved to top */}

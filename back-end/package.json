@@ -37,6 +37,7 @@
     "hardhat-deploy-ethers": "^0.4.0"
   },
   "dependencies": {
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "recharts": "^3.1.0"
   }
 }

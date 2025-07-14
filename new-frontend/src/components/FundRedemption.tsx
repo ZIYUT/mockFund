@@ -21,13 +21,14 @@ const RefreshIcon = ({ onClick, isSpinning = false }: { onClick: () => void; isS
 
 export default function FundRedemption() {
   const { isConnected } = useAccount();
-  const { handleRedeem, userMfcBalance, isRedeeming } = useMockFund();
+  const { handleRedeem, handleApproveMfc, userMfcBalance, isRedeeming } = useMockFund();
   const { getRedemptionPreview, userUsdcBalance, mfcData } = useFundData();
   
   const [mfcAmount, setMfcAmount] = useState('');
   const [previewUsdc, setPreviewUsdc] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [hasCalculatedPreview, setHasCalculatedPreview] = useState(false);
+  const [hasMfcApproved, setHasMfcApproved] = useState(false);
 
   // 手动计算赎回预览
   const calculatePreview = async () => {
@@ -51,11 +52,33 @@ export default function FundRedemption() {
     }
   };
 
-  // 当金额改变时，重置预览状态
+  // 当金额改变时，重置预览状态和授权状态
   useEffect(() => {
     setHasCalculatedPreview(false);
     setPreviewUsdc('');
+    setHasMfcApproved(false);
   }, [mfcAmount]);
+
+  // MFC授权处理函数
+  const handleMfcApproval = async () => {
+    if (!mfcAmount || parseFloat(mfcAmount) <= 0) {
+      alert('请输入有效的赎回数量');
+      return;
+    }
+
+    // 检查余额
+    if (parseFloat(userMfcBalance) < parseFloat(mfcAmount)) {
+      alert('MFC余额不足');
+      return;
+    }
+
+    try {
+      await handleApproveMfc(mfcAmount);
+      setHasMfcApproved(true);
+    } catch (error) {
+      console.error('MFC授权失败:', error);
+    }
+  };
 
   const handleRedemption = async () => {
     if (!mfcAmount || parseFloat(mfcAmount) <= 0) {
@@ -73,6 +96,7 @@ export default function FundRedemption() {
     await handleRedeem(mfcAmount);
     setMfcAmount('');
     setPreviewUsdc('');
+    setHasMfcApproved(false); // 重置授权状态
   };
 
   const handleQuickAmount = (percentage: number) => {
@@ -80,13 +104,13 @@ export default function FundRedemption() {
     setMfcAmount(amount);
   };
 
-  return (
+    return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold mb-2">赎回MFC</h2>
         <p className="text-gray-600">赎回MFC代币，获得等值的USDC</p>
       </div>
-
+      
       {/* 用户余额 */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-green-50 p-4 rounded-lg">
@@ -105,18 +129,18 @@ export default function FundRedemption() {
 
       {/* 赎回表单 */}
       <div className="space-y-4">
-        <div>
+      <div>
           <label htmlFor="mfcAmount" className="block text-sm font-medium text-gray-700 mb-2">
-            赎回数量 (MFC)
-          </label>
-          <input
-            type="number"
+              赎回数量 (MFC)
+            </label>
+            <input
+              type="number"
             id="mfcAmount"
             value={mfcAmount}
             onChange={(e) => setMfcAmount(e.target.value)}
             placeholder="输入MFC数量"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-            min="0"
+              min="0"
             step="0.01"
           />
         </div>
@@ -147,9 +171,9 @@ export default function FundRedemption() {
           >
             全部
           </button>
-        </div>
+          </div>
 
-        {/* 赎回预览 */}
+          {/* 赎回预览 */}
         {mfcAmount && parseFloat(mfcAmount) > 0 && (
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center justify-between mb-2">
@@ -165,7 +189,7 @@ export default function FundRedemption() {
               )}
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between">
+                <div className="flex justify-between">
                 <span>赎回数量:</span>
                 <span className="font-medium">{parseFloat(mfcAmount).toFixed(2)} MFC</span>
               </div>
@@ -191,24 +215,35 @@ export default function FundRedemption() {
                   </span>
                 </div>
               )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 赎回按钮 */}
-        <button
-          onClick={handleRedemption}
-          disabled={isRedeeming || !mfcAmount || parseFloat(mfcAmount) <= 0}
-          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:cursor-not-allowed"
-        >
-          {isRedeeming ? '赎回中...' : '确认赎回'}
-        </button>
+        {/* 授权和赎回按钮 */}
+        {!hasMfcApproved ? (
+          <button
+            onClick={handleMfcApproval}
+            disabled={!mfcAmount || parseFloat(mfcAmount) <= 0}
+            className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:cursor-not-allowed"
+          >
+            授权MFC
+          </button>
+        ) : (
+          <button
+            onClick={handleRedemption}
+            disabled={isRedeeming || !mfcAmount || parseFloat(mfcAmount) <= 0}
+            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:cursor-not-allowed"
+          >
+            {isRedeeming ? '赎回中...' : '确认赎回'}
+          </button>
+        )}
       </div>
 
       {/* 赎回说明 */}
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <h3 className="font-semibold text-red-800 mb-2">赎回说明</h3>
         <ul className="text-sm text-red-700 space-y-1">
+          <li>• 首次赎回需要先授权MFC代币</li>
           <li>• 最小赎回金额: 100 USDC等值</li>
           <li>• 赎回将获得等值的USDC</li>
           <li>• 赎回手续费: 1%</li>

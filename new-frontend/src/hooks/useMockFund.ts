@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWalletClient } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, parseUnits, formatEther, formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from '../../contracts/addresses';
 import MockFundABI from '../contracts/abis/MockFund.json';
 import MockUSDCABI from '../contracts/abis/MockUSDC.json';
 import FundShareTokenABI from '../contracts/abis/FundShareToken.json';
-import { generatePermitSignature, createPermitDeadline } from '../lib/permit';
+
 
 export function useMockFund() {
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,14 +86,16 @@ export function useMockFund() {
   // 投资函数
   const { data: investData, writeContract: invest, isPending: isInvesting } = useWriteContract();
 
-  // Permit投资函数
-  const { data: investWithPermitData, writeContract: investWithPermit, isPending: isInvestingWithPermit } = useWriteContract();
+
 
   // 赎回函数
   const { data: redeemData, writeContract: redeem, isPending: isRedeeming } = useWriteContract();
 
   // 授权USDC函数
   const { data: approveData, writeContract: approveUsdc, isPending: isApproving } = useWriteContract();
+
+  // 授权MFC函数
+  const { data: approveMfcData, writeContract: approveMfc, isPending: isApprovingMfc } = useWriteContract();
 
   // 铸造测试USDC函数
   const { data: mintData, writeContract: mintUSDC, isPending: isMinting } = useWriteContract();
@@ -110,17 +112,7 @@ export function useMockFund() {
     },
   });
 
-  // 等待permit投资交易确认
-  const { isLoading: isInvestWithPermitTxLoading } = useWaitForTransactionReceipt({
-    hash: investWithPermitData?.hash,
-    onSuccess: () => {
-      refetchNav();
-      refetchMfcValue();
-      refetchUserMfcBalance();
-      refetchUserUsdcBalance();
-      refetchUsdcAllowance();
-    },
-  });
+
 
   const { isLoading: isRedeemTxLoading } = useWaitForTransactionReceipt({
     hash: redeemData?.hash,
@@ -144,56 +136,15 @@ export function useMockFund() {
     },
   });
 
-  // 使用permit投资函数（推荐）
-  const handleInvestWithPermit = async (usdcAmount: string) => {
-    if (!isConnected || !address || !walletClient) {
-      setError('请先连接钱包');
-      return;
-    }
+  const { isLoading: isApproveMfcTxLoading } = useWaitForTransactionReceipt({
+    hash: approveMfcData?.hash,
+    onSuccess: () => {
+      console.log('MFC authorization transaction confirmed');
+      // 可以在这里添加刷新MFC授权额度的逻辑
+    },
+  });
 
-    try {
-      setIsLoading(true);
-      setError(null);
 
-      const amountInWei = parseUnits(usdcAmount, 6); // USDC有6位小数
-
-      // 检查USDC余额
-      if (!userUsdcBalance || userUsdcBalance < amountInWei) {
-        setError('USDC余额不足');
-        return;
-      }
-
-      // 生成permit签名
-      const deadline = createPermitDeadline(20); // 20分钟后过期
-      const permitSignature = await generatePermitSignature(
-        CONTRACT_ADDRESSES.MockUSDC,
-        address,
-        CONTRACT_ADDRESSES.MockFund,
-        amountInWei.toString(),
-        deadline,
-        walletClient
-      );
-
-      // 执行permit投资
-      investWithPermit({
-        address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
-        abi: MockFundABI.abi,
-        functionName: 'investWithPermit',
-        args: [
-          amountInWei,
-          deadline,
-          permitSignature.v,
-          permitSignature.r,
-          permitSignature.s
-        ],
-      });
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '投资失败');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // 投资函数（传统方式）
   const handleInvest = async (usdcAmount: string) => {
@@ -214,13 +165,7 @@ export function useMockFund() {
         return;
       }
 
-      // 检查授权额度
-      if (!usdcAllowance || usdcAllowance < amountInWei) {
-        setError('需要先授权USDC');
-        return;
-      }
-
-      // 执行投资
+      // 执行投资（不再检查授权额度）
       invest({
         address: CONTRACT_ADDRESSES.MockFund as `0x${string}`,
         abi: MockFundABI.abi,
@@ -304,6 +249,34 @@ export function useMockFund() {
     }
   };
 
+  // 授权MFC函数
+  const handleApproveMfc = async (amount: string) => {
+    if (!isConnected || !address) {
+      setError('请先连接钱包');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const amountInWei = parseEther(amount); // MFC有18位小数
+
+      // 授权MFC给基金合约
+      approveMfc({
+        address: CONTRACT_ADDRESSES.FundShareToken as `0x${string}`,
+        abi: FundShareTokenABI.abi,
+        functionName: 'approve',
+        args: [CONTRACT_ADDRESSES.MockFund as `0x${string}`, amountInWei],
+      });
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '授权MFC失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 等待铸造交易确认
   const { isLoading: isMintTxLoading } = useWaitForTransactionReceipt({
     hash: mintData?.hash,
@@ -324,7 +297,7 @@ export function useMockFund() {
       setError(null);
 
       const amountInWei = parseUnits(amount, 6); // USDC有6位小数
-
+      
       // 执行铸造
       mintUSDC({
         address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
@@ -350,7 +323,7 @@ export function useMockFund() {
     try {
       setIsLoading(true);
       setError(null);
-
+      
       // 执行快速获取
       mintUSDC({
         address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
@@ -376,7 +349,7 @@ export function useMockFund() {
     try {
       setIsLoading(true);
       setError(null);
-
+      
       // 执行获取大量USDC
       mintUSDC({
         address: CONTRACT_ADDRESSES.MockUSDC as `0x${string}`,
@@ -422,10 +395,13 @@ export function useMockFund() {
   };
 
   return {
+    // 钱包状态
+    isConnected,
+    address,
+    
     // 状态
     isInitialized: isInitialized as boolean,
-    isLoading: isLoading || isInvesting || isInvestingWithPermit || isRedeeming || isApproving || isMinting || 
-               isInvestTxLoading || isInvestWithPermitTxLoading || isRedeemTxLoading || isApproveTxLoading || isMintTxLoading,
+    isLoading: isLoading || isInvesting || isRedeeming || isApproving || isApprovingMfc || isMinting || isInvestTxLoading || isRedeemTxLoading || isApproveTxLoading || isApproveMfcTxLoading || isMintTxLoading,
     error,
     initError,
     initLoading,
@@ -436,19 +412,18 @@ export function useMockFund() {
     supportedTokens,
     userMfcBalance: userMfcBalance ? formatEther(userMfcBalance) : '0',
     userUsdcBalance: userUsdcBalance ? formatUnits(userUsdcBalance, 6) : '0',
-    usdcAllowance: usdcAllowance ? formatUnits(usdcAllowance, 6) : '0',
-
+    
     // 函数
     handleInvest,
-    handleInvestWithPermit,
     handleRedeem,
     handleApproveUsdc,
+    handleApproveMfc,
     getTestUsdc,
     getQuickTestUsdc,
     getLargeTestUsdc,
     getInvestmentPreview,
     getRedemptionPreview,
-
+    
     // 刷新函数
     refetchNav,
     refetchMfcValue,

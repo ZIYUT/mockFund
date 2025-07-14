@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMockFund } from '@/hooks/useMockFund';
 import { parseUnits } from 'viem';
 
@@ -14,6 +14,12 @@ export default function GetTestTokens() {
     mintUSDC,
     getTestUsdc,
   } = useMockFund();
+  
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const [amount, setAmount] = useState('10000'); // 默认10000 USDC
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +50,17 @@ export default function GetTestTokens() {
       setError(error instanceof Error ? error.message : '铸造USDC失败');
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="p-6 bg-white rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">获取测试代币</h2>
+        <div className="text-center py-8">
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">

@@ -70,27 +70,26 @@ async function main() {
     console.log("✅ UniswapIntegration已部署:", uniswapIntegrationAddress);
     deploymentData.contracts.UniswapIntegration = uniswapIntegrationAddress;
 
-    // 4. 部署MockFund
+    // 4. 部署MockFund (修正构造参数)
     console.log("📝 4. 部署MockFund...");
     const MockFund = await ethers.getContractFactory("contracts/MockFund.sol:MockFund");
     const mockFund = await MockFund.deploy(
-      mockUSDCAddress,
-      uniswapIntegrationAddress,
-      priceOracleAddress,
-      deploymentData.configuration.managementFeeRate
+      "MockFund Coin", // _shareTokenName
+      "MFC", // _shareTokenSymbol
+      deployer.address, // _initialOwner
+      deploymentData.configuration.managementFeeRate, // _managementFeeRate
+      priceOracleAddress, // _priceOracle
+      uniswapIntegrationAddress // _uniswapIntegration
     );
     await mockFund.waitForDeployment();
     const mockFundAddress = await mockFund.getAddress();
     console.log("✅ MockFund已部署:", mockFundAddress);
     deploymentData.contracts.MockFund = mockFundAddress;
 
-    // 5. 部署FundShareToken
-    console.log("📝 5. 部署FundShareToken...");
-    const FundShareToken = await ethers.getContractFactory("FundShareToken");
-    const fundShareToken = await FundShareToken.deploy(mockFundAddress);
-    await fundShareToken.waitForDeployment();
-    const fundShareTokenAddress = await fundShareToken.getAddress();
-    console.log("✅ FundShareToken已部署:", fundShareTokenAddress);
+    // 5. 获取FundShareToken地址 (由MockFund构造函数创建)
+    console.log("📝 5. 获取FundShareToken地址...");
+    const fundShareTokenAddress = await mockFund.shareToken();
+    console.log("✅ FundShareToken地址:", fundShareTokenAddress);
     deploymentData.contracts.FundShareToken = fundShareTokenAddress;
 
     // 6. 设置USDC token
@@ -179,7 +178,7 @@ async function main() {
 
     // 11. 初始化基金
     console.log("📝 11. 初始化基金...");
-    await mockFund.initializeFund();
+    await mockFund.initializeFund(ethers.parseUnits("1000000", 6)); // 1M USDC
     console.log("✅ 基金已初始化");
 
     // 12. 保存部署信息

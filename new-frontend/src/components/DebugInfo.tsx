@@ -3,9 +3,15 @@
 import { useAccount, useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '../../contracts/addresses';
 import MockFundABI from '@/contracts/abis/MockFund.json';
+import { useState, useEffect } from 'react';
 
 export default function DebugInfo() {
   const { address, isConnected, chainId } = useAccount();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 测试合约调用
   const { data: isInitialized, error: initError, isLoading: initLoading } = useContractRead({
@@ -24,6 +30,17 @@ export default function DebugInfo() {
     functionName: 'calculateNAV',
     enabled: isInitialized as boolean,
   });
+
+  if (!mounted) {
+    return (
+      <div className="p-4 bg-gray-100 rounded-lg">
+        <h3 className="text-lg font-bold mb-4">调试信息</h3>
+        <div className="space-y-2">
+          <p>加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 bg-gray-100 rounded-lg">
@@ -47,4 +64,4 @@ export default function DebugInfo() {
       </div>
     </div>
   );
-} 
+}

@@ -3,18 +3,19 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  console.log("🚀 开始部署支持permit功能的合约到Sepolia测试网...");
+  console.log("🚀 完成permit功能合约部署（使用已部署的合约）...");
   
   const [deployer] = await ethers.getSigners();
   console.log("部署者地址:", deployer.address);
   
-  // 检查部署者余额
-  const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("部署者余额:", ethers.formatEther(balance), "ETH");
-  
-  if (balance < ethers.parseEther("0.01")) {
-    throw new Error("部署者余额不足，请确保有足够的ETH支付gas费用");
-  }
+  // 使用已经部署的合约地址
+  const deployedContracts = {
+    MockUSDC: "0x4fCffF7a71255d78EB67182C81235b468CDF0f7A",
+    ChainlinkPriceOracle: "0x8b15C6ab5c13BE9Bdaec7A29B50FE80E68241534",
+    UniswapIntegration: "0x6ccfC30BD671d5Ad5dcb7b4acc05F603f1d6EB76",
+    MockFund: "0x8CFea8e742A017e2616e3a2D6704FCc102f8D63A",
+    FundShareToken: "0xb5cCbdbb50e57B420Cf966cbbf273899866F5A63"
+  };
 
   const deploymentData = {
     network: "sepolia",
@@ -22,8 +23,10 @@ async function main() {
     deployer: deployer.address,
     deploymentTime: new Date().toISOString(),
     permitVersion: true,
-    contracts: {},
-    tokens: {},
+    contracts: deployedContracts,
+    tokens: {
+      USDC: deployedContracts.MockUSDC
+    },
     chainlinkFeeds: {
       "ETH": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
       "BTC": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43",
@@ -42,73 +45,31 @@ async function main() {
   };
 
   try {
-    // 1. 部署支持permit的MockUSDC
-    console.log("📝 1. 部署支持permit的MockUSDC...");
+    // 连接到已部署的合约
+    console.log("📝 连接到已部署的合约...");
     const MockUSDC = await ethers.getContractFactory("MockUSDC");
-    const mockUSDC = await MockUSDC.deploy(deployer.address);
-    await mockUSDC.waitForDeployment();
-    const mockUSDCAddress = await mockUSDC.getAddress();
-    console.log("✅ MockUSDC已部署:", mockUSDCAddress);
-    deploymentData.contracts.MockUSDC = mockUSDCAddress;
-    deploymentData.tokens.USDC = mockUSDCAddress;
-
-    // 2. 部署ChainlinkPriceOracle
-    console.log("📝 2. 部署ChainlinkPriceOracle...");
     const ChainlinkPriceOracle = await ethers.getContractFactory("ChainlinkPriceOracle");
-    const priceOracle = await ChainlinkPriceOracle.deploy(deployer.address);
-    await priceOracle.waitForDeployment();
-    const priceOracleAddress = await priceOracle.getAddress();
-    console.log("✅ ChainlinkPriceOracle已部署:", priceOracleAddress);
-    deploymentData.contracts.ChainlinkPriceOracle = priceOracleAddress;
-
-    // 3. 部署UniswapIntegration
-    console.log("📝 3. 部署UniswapIntegration...");
     const UniswapIntegration = await ethers.getContractFactory("contracts/UniswapIntegration.sol:UniswapIntegration");
-    const uniswapIntegration = await UniswapIntegration.deploy(mockUSDCAddress, priceOracleAddress);
-    await uniswapIntegration.waitForDeployment();
-    const uniswapIntegrationAddress = await uniswapIntegration.getAddress();
-    console.log("✅ UniswapIntegration已部署:", uniswapIntegrationAddress);
-    deploymentData.contracts.UniswapIntegration = uniswapIntegrationAddress;
-
-    // 4. 部署MockFund
-    console.log("📝 4. 部署MockFund...");
     const MockFund = await ethers.getContractFactory("contracts/MockFund.sol:MockFund");
-    const mockFund = await MockFund.deploy(
-      mockUSDCAddress,
-      uniswapIntegrationAddress,
-      priceOracleAddress,
-      deploymentData.configuration.managementFeeRate
-    );
-    await mockFund.waitForDeployment();
-    const mockFundAddress = await mockFund.getAddress();
-    console.log("✅ MockFund已部署:", mockFundAddress);
-    deploymentData.contracts.MockFund = mockFundAddress;
 
-    // 5. 部署FundShareToken
-    console.log("📝 5. 部署FundShareToken...");
-    const FundShareToken = await ethers.getContractFactory("FundShareToken");
-    const fundShareToken = await FundShareToken.deploy(mockFundAddress);
-    await fundShareToken.waitForDeployment();
-    const fundShareTokenAddress = await fundShareToken.getAddress();
-    console.log("✅ FundShareToken已部署:", fundShareTokenAddress);
-    deploymentData.contracts.FundShareToken = fundShareTokenAddress;
+    const mockUSDC = MockUSDC.attach(deployedContracts.MockUSDC);
+    const priceOracle = ChainlinkPriceOracle.attach(deployedContracts.ChainlinkPriceOracle);
+    const uniswapIntegration = UniswapIntegration.attach(deployedContracts.UniswapIntegration);
+    const mockFund = MockFund.attach(deployedContracts.MockFund);
 
-    // 6. 设置USDC token
-    console.log("📝 6. 设置USDC token...");
-    await mockUSDC.setToken("USDC");
-    console.log("✅ USDC token已设置");
+    console.log("✅ 已连接到已部署的合约");
 
-    // 7. 部署MockTokens
-    console.log("📝 7. 部署MockTokens...");
+    // 1. 部署MockTokens
+    console.log("📝 1. 部署MockTokens...");
     const MockWETH = await ethers.getContractFactory("MockWETH");
     const MockWBTC = await ethers.getContractFactory("MockWBTC");
     const MockLINK = await ethers.getContractFactory("MockLINK");
     const MockDAI = await ethers.getContractFactory("MockDAI");
 
-    const mockWETH = await MockWETH.deploy();
-    const mockWBTC = await MockWBTC.deploy();
-    const mockLINK = await MockLINK.deploy();
-    const mockDAI = await MockDAI.deploy();
+    const mockWETH = await MockWETH.deploy(deployer.address);
+    const mockWBTC = await MockWBTC.deploy(deployer.address);
+    const mockLINK = await MockLINK.deploy(deployer.address);
+    const mockDAI = await MockDAI.deploy(deployer.address);
 
     await mockWETH.waitForDeployment();
     await mockWBTC.waitForDeployment();
@@ -131,8 +92,8 @@ async function main() {
     deploymentData.tokens.LINK = mockLINKAddress;
     deploymentData.tokens.DAI = mockDAIAddress;
 
-    // 8. 添加支持的代币到MockFund
-    console.log("📝 8. 添加支持的代币...");
+    // 2. 添加支持的代币到MockFund
+    console.log("📝 2. 添加支持的代币...");
     await mockFund.addSupportedToken(mockWETHAddress, 1250);
     await mockFund.addSupportedToken(mockWBTCAddress, 1250);
     await mockFund.addSupportedToken(mockLINKAddress, 1250);
@@ -145,8 +106,8 @@ async function main() {
     deploymentData.configuration.supportedTokens[2].token = mockLINKAddress;
     deploymentData.configuration.supportedTokens[3].token = mockDAIAddress;
 
-    // 9. 设置UniswapIntegration
-    console.log("📝 9. 设置UniswapIntegration...");
+    // 3. 设置UniswapIntegration
+    console.log("📝 3. 设置UniswapIntegration...");
     await uniswapIntegration.setFixedRate(mockWETHAddress, ethers.parseUnits("3000", 6)); // $3000
     await uniswapIntegration.setFixedRate(mockWBTCAddress, ethers.parseUnits("118000", 6)); // $118,000
     await uniswapIntegration.setFixedRate(mockLINKAddress, ethers.parseUnits("15", 6)); // $15
@@ -164,26 +125,26 @@ async function main() {
     console.log("FixedRate for", mockLINKAddress + ":", linkRate.toString());
     console.log("FixedRate for", mockDAIAddress + ":", daiRate.toString());
 
-    // 10. 添加流动性
-    console.log("📝 10. 添加流动性...");
+    // 4. 添加流动性
+    console.log("📝 4. 添加流动性...");
     const liquidityAmount = ethers.parseUnits("1000000", 6); // 1M USDC worth of each token
     
     // 为UniswapIntegration添加代币余额
-    await mockWETH.mint(uniswapIntegrationAddress, ethers.parseEther("333")); // 333 WETH = ~1M USDC
-    await mockWBTC.mint(uniswapIntegrationAddress, ethers.parseUnits("8.5", 8)); // 8.5 WBTC = ~1M USDC
-    await mockLINK.mint(uniswapIntegrationAddress, ethers.parseEther("66667")); // 66667 LINK = ~1M USDC
-    await mockDAI.mint(uniswapIntegrationAddress, ethers.parseEther("1000000")); // 1M DAI = ~1M USDC
-    await mockUSDC.mint(uniswapIntegrationAddress, ethers.parseUnits("1000000", 6)); // 1M USDC
+    await mockWETH.mint(deployedContracts.UniswapIntegration, ethers.parseEther("333")); // 333 WETH = ~1M USDC
+    await mockWBTC.mint(deployedContracts.UniswapIntegration, ethers.parseUnits("8.5", 8)); // 8.5 WBTC = ~1M USDC
+    await mockLINK.mint(deployedContracts.UniswapIntegration, ethers.parseEther("66667")); // 66667 LINK = ~1M USDC
+    await mockDAI.mint(deployedContracts.UniswapIntegration, ethers.parseEther("1000000")); // 1M DAI = ~1M USDC
+    await mockUSDC.mint(deployedContracts.UniswapIntegration, ethers.parseUnits("1000000", 6)); // 1M USDC
 
     console.log("✅ 流动性已添加");
 
-    // 11. 初始化基金
-    console.log("📝 11. 初始化基金...");
-    await mockFund.initializeFund();
+    // 5. 初始化基金
+    console.log("📝 5. 初始化基金...");
+    await mockFund.initializeFund(ethers.parseUnits("1000000", 6)); // 1M USDC
     console.log("✅ 基金已初始化");
 
-    // 12. 保存部署信息
-    console.log("📝 12. 保存部署信息...");
+    // 6. 保存部署信息
+    console.log("📝 6. 保存部署信息...");
     const deploymentsDir = path.join(__dirname, "..", "deployments");
     const permitDeploymentsDir = path.join(deploymentsDir, "permit-version");
     
@@ -196,14 +157,14 @@ async function main() {
     fs.writeFileSync(deploymentFile, JSON.stringify(deploymentData, null, 2));
     console.log("✅ 部署信息已保存到:", deploymentFile);
 
-    // 13. 显示部署总结
+    // 7. 显示部署总结
     console.log("\n🎉 部署完成！支持permit功能的合约已成功部署到Sepolia测试网");
     console.log("\n📋 部署总结:");
-    console.log("MockUSDC (支持permit):", mockUSDCAddress);
-    console.log("ChainlinkPriceOracle:", priceOracleAddress);
-    console.log("UniswapIntegration:", uniswapIntegrationAddress);
-    console.log("MockFund:", mockFundAddress);
-    console.log("FundShareToken:", fundShareTokenAddress);
+    console.log("MockUSDC (支持permit):", deployedContracts.MockUSDC);
+    console.log("ChainlinkPriceOracle:", deployedContracts.ChainlinkPriceOracle);
+    console.log("UniswapIntegration:", deployedContracts.UniswapIntegration);
+    console.log("MockFund:", deployedContracts.MockFund);
+    console.log("FundShareToken:", deployedContracts.FundShareToken);
     console.log("\n代币地址:");
     console.log("WETH:", mockWETHAddress);
     console.log("WBTC:", mockWBTCAddress);

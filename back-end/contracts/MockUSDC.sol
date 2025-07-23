@@ -11,9 +11,7 @@ contract MockUSDC is ERC20, Ownable {
     event TokensBurned(address indexed from, uint256 amount);
     event FaucetUsed(address indexed user, uint256 amount);
 
-    constructor(address _initialOwner) 
-        ERC20("Mock USD Coin", "USDC") 
-        Ownable(_initialOwner) 
+    constructor(address _initialOwner) ERC20("Mock USD Coin", "USDC") Ownable(_initialOwner) 
     {
         require(_initialOwner != address(0), "Invalid owner address");
         
@@ -25,19 +23,17 @@ contract MockUSDC is ERC20, Ownable {
         return 6;
     }
 
-    function mint(address to, uint256 amount) external {
-        require(to != address(0), "Cannot mint to zero address");
+    function faucet(uint256 amount) external {
         require(amount > 0, "Amount must be greater than zero");
-        require(amount <= 1000000 * 10**decimals(), "Amount too large"); // Maximum 1,000,000 USDC per mint
+        require(amount <= 10000 * 10**decimals(), "Amount too large"); // Maximum 10,000 USDC per request
         
-        _mint(to, amount);
-        emit TokensMinted(to, amount);
+        _mint(msg.sender, amount);
+        emit FaucetUsed(msg.sender, amount);
     }
 
     function burn(uint256 amount) external {
         require(amount > 0, "Amount must be greater than zero");
         require(balanceOf(msg.sender) >= amount, "Insufficient balance");
-        
         _burn(msg.sender, amount);
         emit TokensBurned(msg.sender, amount);
     }
@@ -55,23 +51,12 @@ contract MockUSDC is ERC20, Ownable {
         }
     }
 
-    function faucet(uint256 amount) external {
-        require(amount > 0, "Amount must be greater than zero");
-        require(amount <= 10000 * 10**decimals(), "Amount too large"); // Maximum 10,000 USDC per request
-        
-        _mint(msg.sender, amount);
-        emit FaucetUsed(msg.sender, amount);
-    }
-
     function getTestTokens() external {
         uint256 testAmount = 1000 * 10**decimals(); // 1000 USDC
         _mint(msg.sender, testAmount);
         emit FaucetUsed(msg.sender, testAmount);
     }
     
-    /**
-     * @dev Quickly get large amount of USDC for testing purposes
-     */
     function getLargeAmount() external {
         uint256 largeAmount = 1000000 * 10**decimals(); // 1,000,000 USDC
         _mint(msg.sender, largeAmount);
@@ -79,7 +64,7 @@ contract MockUSDC is ERC20, Ownable {
     }
     
     /**
-     * @dev Mint USDC for contract address (for testing)
+     * @dev Mint USDC for contract address (for testing purpose)
      */
     function mintForContract(address contractAddress, uint256 amount) external onlyOwner {
         require(contractAddress != address(0), "Invalid contract address");
